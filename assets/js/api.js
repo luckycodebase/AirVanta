@@ -520,17 +520,29 @@ const API = {
       }
 
       const data = [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
       
       for (let i = days - 1; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
+        date.setHours(0, 0, 0, 0);
         
-        const dayOfWeek = date.getDay();
-        const weekendVariation = (dayOfWeek === 0 || dayOfWeek === 6) ? -8 : 5;
-        const seasonalTrend = Math.sin(i / 30 * Math.PI) * 20;
-        const randomVariation = (Math.random() - 0.5) * 25;
+        let aqi;
         
-        const aqi = Math.max(0, Math.round(currentAQI + weekendVariation + seasonalTrend + randomVariation));
+        // For TODAY, use exact current AQI without variations
+        if (i === 0) {
+          aqi = currentAQI;
+          console.log(`📍 Using exact current AQI for today: ${aqi}`);
+        } else {
+          // For past days, generate variations
+          const dayOfWeek = date.getDay();
+          const weekendVariation = (dayOfWeek === 0 || dayOfWeek === 6) ? -8 : 5;
+          const seasonalTrend = Math.sin(i / 30 * Math.PI) * 20;
+          const randomVariation = (Math.random() - 0.5) * 25;
+          
+          aqi = Math.max(0, Math.round(currentAQI + weekendVariation + seasonalTrend + randomVariation));
+        }
         
         data.push({
           date: Utils.formatDate(date),
@@ -540,7 +552,7 @@ const API = {
         });
       }
       
-      console.log(`⚠️ Generated ${data.length} days of synthetic data`);
+      console.log(`⚠️ Generated ${data.length} days of synthetic data (today's AQI: ${currentAQI})`);
       return data;
       
     } catch (error) {

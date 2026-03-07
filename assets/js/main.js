@@ -122,10 +122,7 @@ const App = {
       // Use setTimeout to ensure DOM class is applied first
       setTimeout(() => {
         if (typeof Prediction !== 'undefined' && typeof Prediction.updateChartTheme === 'function') {
-          console.log('Calling updateChartTheme');
           Prediction.updateChartTheme();
-        } else {
-          console.log('Prediction.updateChartTheme not available');
         }
       }, 10);
     });

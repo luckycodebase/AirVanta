@@ -14,9 +14,11 @@ const Dashboard = {
     
     // Automatically collect historical AQI data for predictions
     if (data.aqi !== undefined && data.city) {
-      // Update history and regenerate forecast for the same city immediately.
-      Prediction.collectHistoricalAQI(data.aqi, data.city);
-      Prediction.generateAndDisplayForecast('aqi', data.city);
+      // Update history and regenerate forecast for the same city
+      Prediction.collectHistoricalAQI(data.aqi, data.city).then(() => {
+        // Wait for history collection to complete before generating forecast
+        Prediction.generateAndDisplayForecast('aqi', data.city);
+      });
     }
   },
 

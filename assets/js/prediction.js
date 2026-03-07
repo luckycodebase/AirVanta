@@ -20,13 +20,9 @@ const Prediction = {
   
   // STEP 3: Update chart colors when theme changes
   updateChartTheme: () => {
-    if (!Prediction.forecastChart) {
-      console.log('No chart to update');
-      return;
-    }
+    if (!Prediction.forecastChart) return;
     
     const colors = Prediction.getChartColors();
-    console.log('Updating chart with colors:', colors);
     
     // Update legend colors
     Prediction.forecastChart.options.plugins.legend.labels.color = colors.textPrimary;
@@ -47,7 +43,6 @@ const Prediction = {
     
     // Apply changes with active mode to force redraw
     Prediction.forecastChart.update('active');
-    console.log('Chart updated');
   },
   
   // Initialize prediction system
@@ -75,10 +70,16 @@ const Prediction = {
         history = JSON.parse(history);
       }
       
-      // Avoid duplicate entries for same day
-      if (history.length > 0 && history[history.length - 1].date === today) {
-        history[history.length - 1] = { date: today, aqi: currentAQI, city: city };
+      // Find existing entry for this city and date
+      const existingIndex = history.findIndex(
+        h => h.date === today && (h.city || '').toLowerCase() === city.toLowerCase()
+      );
+      
+      if (existingIndex >= 0) {
+        // Update existing entry for this city and date
+        history[existingIndex] = { date: today, aqi: currentAQI, city: city };
       } else {
+        // Add new entry
         history.push({ date: today, aqi: currentAQI, city: city });
       }
       
@@ -88,7 +89,7 @@ const Prediction = {
       }
       
       Utils.storage.set('aqi_history', JSON.stringify(history));
-      Prediction.historicalData = history;
+      console.log(`✅ Stored today's AQI (${currentAQI}) for ${city}`);
       return history;
     } catch (error) {
       console.error('Error collecting historical AQI:', error);
@@ -116,12 +117,15 @@ const Prediction = {
     try {
       console.log(`🔄 Preparing WAQI-based historical training data for ${city}...`);
 
+      // Load fresh data from localStorage
       Prediction.loadStoredHistory();
 
       // Keep only entries for current city and sort by date
       const cityHistory = (Prediction.historicalData || [])
-        .filter(item => (item.city || '').toLowerCase() === city.toLowerCase())
+        .filter(item => item && item.city && item.city.toLowerCase() === city.toLowerCase())
         .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      console.log(`📊 Found ${cityHistory.length} historical entries for ${city}`);
 
       if (cityHistory.length >= 7) {
         Prediction.historicalData = cityHistory.slice(-30);
@@ -133,19 +137,37 @@ const Prediction = {
       console.warn('⚠️ Not enough WAQI/local history, generating WAQI-based fallback history');
       const fallbackHistory = await API.generateSyntheticHistoricalData(city, 30);
 
-      Prediction.historicalData = fallbackHistory.map(d => ({
-        date: d.date,
-        aqi: d.aqi,
-        city: city
-      }));
+      // Map fallback data but preserve any real data we have (especially today's)
+      const today = Utils.formatDate(new Date());
+      const realTodayData = cityHistory.find(h => h.date === today);
+      
+      Prediction.historicalData = fallbackHistory.map(d => {
+        // If we have real data for this date (especially today), use it instead of synthetic
+        const realData = cityHistory.find(h => h.date === d.date);
+        if (realData) {
+          console.log(`📌 Using real AQI data for ${d.date}: ${realData.aqi} (instead of synthetic ${d.aqi})`);
+          return {
+            date: realData.date,
+            aqi: realData.aqi,
+            city: city
+          };
+        }
+        
+        return {
+          date: d.date,
+          aqi: d.aqi,
+          city: city
+        };
+      });
 
+      console.log(`✅ Generated ${Prediction.historicalData.length} fallback days for ${city} (with real data preserved)`);
       return Prediction.historicalData;
     } catch (error) {
       console.error('❌ Error preparing training data:', error);
       console.log('⚠️ Falling back to localStorage history');
       Prediction.loadStoredHistory();
       Prediction.historicalData = (Prediction.historicalData || [])
-        .filter(item => (item.city || '').toLowerCase() === city.toLowerCase())
+        .filter(item => item && item.city && item.city.toLowerCase() === city.toLowerCase())
         .slice(-30);
       return Prediction.historicalData;
     }
@@ -466,12 +488,31 @@ const Prediction = {
     const dangerous = predictions.filter(p => p.aqi > 150).slice(0, 5); // Show top 5
     
     if (dangerous.length === 0) {
-      return '✓ No high pollution days predicted';
+      return '<div class="no-danger-message"><i class="fas fa-check-circle"></i> No high pollution days predicted</div>';
     }
 
-    return dangerous
-      .map(d => `${d.date} (AQI: ${d.aqi} - ${d.category})`)
-      .join(' • ');
+    const dayColors = {
+      'Unhealthy for Sensitive Groups': '#f97316',
+      'Unhealthy': '#ef4444',
+      'Very Unhealthy': '#a855f7',
+      'Hazardous': '#7c2d12'
+    };
+
+    return dangerous.map(d => {
+      const date = Prediction.parseAQIDate(d.date);
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }); // Mon, Tue, etc.
+      const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); // Mar 7
+      const color = dayColors[d.category] || '#ef4444';
+      
+      return `
+        <div class="danger-day-card" style="border-left-color: ${color}">
+          <div class="danger-day-name">${dayName}</div>
+          <div class="danger-day-date">${monthDay}</div>
+          <div class="danger-day-aqi" style="color: ${color}">${d.aqi}</div>
+          <div class="danger-day-category">${d.category}</div>
+        </div>
+      `;
+    }).join('');
   },
 
   // Create combined historical + forecast chart
@@ -649,12 +690,15 @@ const Prediction = {
       const city = cityOverride || lastLocation?.city || 'Unknown';
       Prediction.currentCity = city;
 
+      console.log(`🎯 Starting forecast generation for ${city} (Request #${requestId})`);
+
       // STEP 1: Prepare historical data for this city
       console.log(`📊 Loading historical training data for ${city}...`);
       await Prediction.fetchHistoricalForTraining(city);
 
       // Abort if a newer request started (e.g., rapid city changes)
       if (requestId !== Prediction.activeRequestId) {
+        console.log(`⚠️ Aborting stale request #${requestId}, newer request in progress`);
         Utils.toggleLoading(false);
         return;
       }
@@ -662,6 +706,15 @@ const Prediction = {
       // Normalize to real historical range only (past/today), excluding future dates
       const historicalData = Prediction.prepareHistoricalData(Prediction.historicalData);
       Prediction.historicalData = historicalData;
+
+      console.log(`📋 Prepared ${historicalData.length} historical days for ${city}`);
+      
+      // Log today's AQI for debugging
+      const today = Utils.formatDate(new Date());
+      const todayData = historicalData.find(h => h.date === today);
+      if (todayData) {
+        console.log(`📌 Today's AQI for ${city}: ${todayData.aqi}`);
+      }
 
       if (historicalData.length === 0) {
         throw new Error('No valid historical data up to today available for forecasting.');
@@ -702,14 +755,14 @@ const Prediction = {
       }
 
       // STEP 4: Create chart with both historical and predictions
-      console.log(`📈 Rendering forecast chart with ${historicalData.length} historical + ${predictions.length} predicted days`);
+      console.log(`📈 Rendering ${city} forecast: ${historicalData.length} historical + ${predictions.length} predicted days`);
       Prediction.createForecastChart(historicalData, predictions, type);
 
       // STEP 5: Update dangerous days warning
       const warningText = Prediction.getDangerousDays(predictions);
       const warningElement = document.getElementById('warningDays');
       if (warningElement) {
-        warningElement.textContent = warningText;
+        warningElement.innerHTML = warningText;
       }
 
       // STEP 6: Show model quality (R² value)
@@ -737,7 +790,7 @@ const Prediction = {
         }
       }
 
-      console.log(`✅ Forecast generated successfully`);
+      console.log(`✅ Forecast for ${city} generated successfully (Request #${requestId})`);
       Utils.toggleLoading(false);
     } catch (error) {
       console.error('❌ Error generating forecast:', error);
