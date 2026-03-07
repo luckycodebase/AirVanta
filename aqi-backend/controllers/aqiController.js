@@ -205,6 +205,9 @@ exports.storeAQI = async (req, res) => {
     // Fetch current AQI from WAQI
     const aqiData = await waqiService.fetchCurrentAQI(city);
 
+    // Calculate category from AQI value
+    const category = waqiService.getAQICategory(aqiData.aqi);
+
     // Create new AQIHistory record
     const aqiRecord = new AQIHistory({
       city: aqiData.city,
@@ -212,6 +215,7 @@ exports.storeAQI = async (req, res) => {
       latitude: aqiData.latitude,
       longitude: aqiData.longitude,
       aqi: aqiData.aqi,
+      category: category,
       pollutants: aqiData.pollutants,
       dominantPollutant: aqiData.dominantPollutant,
       date: new Date(),
@@ -220,7 +224,7 @@ exports.storeAQI = async (req, res) => {
 
     await aqiRecord.save();
 
-    console.log(`✅ AQI data stored successfully for ${city}`);
+    console.log(`✅ AQI data stored successfully for ${city} (Category: ${category})`);
 
     res.json({
       success: true,

@@ -11,7 +11,10 @@ const API = {
       
       if (!response.ok) {
         console.warn('Backend failed, falling back to direct WAQI API...');
-        return API.getAQIDirect(city);
+        const data = await API.getAQIDirect(city);
+        // Store to database even from fallback
+        API.storeAQIToDatabase(data);
+        return data;
       }
       
       const result = await response.json();
@@ -20,11 +23,17 @@ const API = {
         throw new Error(result.error || 'Failed to fetch AQI');
       }
       
+      // Store the fetched data to MongoDB
+      API.storeAQIToDatabase(result.data);
+      
       return result.data;
     } catch (error) {
       console.error('Error fetching AQI:', error);
       console.log('Falling back to direct WAQI API...');
-      return await API.getAQIDirect(city);
+      const data = await API.getAQIDirect(city);
+      // Store to database even from fallback
+      API.storeAQIToDatabase(data);
+      return data;
     }
   },
 
@@ -38,7 +47,10 @@ const API = {
       
       if (!response.ok) {
         console.warn('Backend failed, falling back to direct WAQI API...');
-        return API.getAQIByCoordinatesDirect(lat, lon);
+        const data = await API.getAQIByCoordinatesDirect(lat, lon);
+        // Store to database even from fallback
+        API.storeAQIToDatabase(data);
+        return data;
       }
       
       const result = await response.json();
@@ -47,11 +59,17 @@ const API = {
         throw new Error(result.error || 'Cannot get AQI for location');
       }
       
+      // Store the fetched data to MongoDB
+      API.storeAQIToDatabase(result.data);
+      
       return result.data;
     } catch (error) {
       console.error('Error fetching AQI by coordinates:', error);
       console.log('Falling back to direct WAQI API...');
-      return await API.getAQIByCoordinatesDirect(lat, lon);
+      const data = await API.getAQIByCoordinatesDirect(lat, lon);
+      // Store to database even from fallback
+      API.storeAQIToDatabase(data);
+      return data;
     }
   },
 
@@ -624,6 +642,42 @@ const API = {
         });
       }
       return data;
+    }
+  },
+
+  // Store AQI data to MongoDB backend
+  storeAQIToDatabase: async (aqiData) => {
+    try {
+      if (!aqiData || !aqiData.city) {
+        console.warn('⚠️ Invalid AQI data for storing');
+        return false;
+      }
+
+      const response = await fetch('http://localhost:5001/api/aqi/store', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          city: aqiData.city
+        })
+      });
+
+      if (!response.ok) {
+        console.warn(`⚠️ Failed to store AQI for ${aqiData.city}:`, response.status);
+        return false;
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        console.log(`💾 Successfully stored AQI data for ${aqiData.city} in MongoDB`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.warn(`⚠️ Error storing AQI data:`, error.message);
+      // Silent fail - don't block user experience
+      return false;
     }
   }
 };
