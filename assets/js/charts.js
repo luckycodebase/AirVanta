@@ -19,18 +19,64 @@ const Charts = {
 
   // Initialize all charts
   initCharts: async () => {
-    Charts.createAQITrendChart();
+    await Charts.createAQITrendChart();
     Charts.createPollutantChart();
     await Charts.createHourlyChart();
     await Charts.createHistoricalChart();
   },
 
   // Create 7-day AQI trend chart
-  createAQITrendChart: () => {
+  createAQITrendChart: async () => {
     const ctx = document.getElementById('aqiTrendChart');
     if (!ctx) return;
 
-    const data = Utils.generateDemoData(7);
+    const currentData = Utils.storage.get('lastLocation');
+    const city = currentData?.city || 'Unknown';
+    let data = [];
+
+    try {
+      const response = await fetch(
+        `http://localhost:5001/api/aqi/history/${encodeURIComponent(city)}?days=7`
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        const backendData = Array.isArray(result?.data) ? result.data : [];
+
+        data = backendData.map((item) => ({
+          date: Utils.formatDate(new Date(item.date)),
+          value: Math.round(Number(item.aqi) || 0)
+        }));
+      }
+    } catch (error) {
+      console.warn('7-day trend backend fetch unavailable, trying local history fallback.');
+    }
+
+    // Fallback to local history for the city if backend has no data yet.
+    if (!data.length) {
+      const localHistory = Utils.storage.get('aqi_history', []) || [];
+      const normalizedCity = (city || '').toString().toLowerCase();
+
+      data = localHistory
+        .filter(item => item && item.city && item.date)
+        .filter(item => (item.city || '').toString().toLowerCase().includes(normalizedCity) || normalizedCity.includes((item.city || '').toString().toLowerCase()))
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .slice(-7)
+        .map((item) => ({
+          date: Utils.formatDate(new Date(item.date)),
+          value: Math.round(Number(item.aqi) || 0)
+        }));
+    }
+
+    // If still empty, use one stable point from current AQI card data instead of random demo data.
+    if (!data.length) {
+      const latestAQI = Number(currentData?.aqi);
+      if (Number.isFinite(latestAQI)) {
+        data = [{ date: Utils.formatDate(new Date()), value: Math.round(latestAQI) }];
+      } else {
+        data = [{ date: Utils.formatDate(new Date()), value: 0 }];
+      }
+    }
 
     if (Charts.instances.aqiTrend) {
       Charts.instances.aqiTrend.destroy();
