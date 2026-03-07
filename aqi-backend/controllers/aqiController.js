@@ -208,6 +208,40 @@ exports.storeAQI = async (req, res) => {
     // Calculate category from AQI value
     const category = waqiService.getAQICategory(aqiData.aqi);
 
+    // Check if we already have data for this city today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const existingRecord = await AQIHistory.findOne({
+      city: { $regex: new RegExp(`^${aqiData.city}$`, 'i') },
+      date: { $gte: today }
+    });
+
+    if (existingRecord) {
+      console.log(`ℹ️  Data already exists for ${aqiData.city} today - updating instead of creating duplicate`);
+      
+      // Update existing record
+      existingRecord.aqi = aqiData.aqi;
+      existingRecord.category = category;
+      existingRecord.pollutants = aqiData.pollutants;
+      existingRecord.dominantPollutant = aqiData.dominantPollutant;
+      existingRecord.latitude = aqiData.latitude;
+      existingRecord.longitude = aqiData.longitude;
+      existingRecord.country = aqiData.country;
+      existingRecord.lastUpdated = new Date();
+      
+      await existingRecord.save();
+      
+      console.log(`✅ Updated AQI data for ${aqiData.city} (Category: ${category})`);
+      
+      return res.json({
+        success: true,
+        message: 'AQI data updated successfully',
+        data: existingRecord,
+        updated: true
+      });
+    }
+
     // Create new AQIHistory record
     const aqiRecord = new AQIHistory({
       city: aqiData.city,
@@ -229,7 +263,8 @@ exports.storeAQI = async (req, res) => {
     res.json({
       success: true,
       message: 'AQI data stored successfully',
-      data: aqiRecord
+      data: aqiRecord,
+      updated: false
     });
 
   } catch (error) {

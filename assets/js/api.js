@@ -3,6 +3,8 @@
 const API = {
   // Get AQI data for location
   getAQI: async (city) => {
+    let aqiData = null;
+    
     try {
       // Use backend API for better reliability
       const response = await fetch(
@@ -11,34 +13,36 @@ const API = {
       
       if (!response.ok) {
         console.warn('Backend failed, falling back to direct WAQI API...');
-        const data = await API.getAQIDirect(city);
-        // Store to database even from fallback
-        API.storeAQIToDatabase(data);
-        return data;
+        aqiData = await API.getAQIDirect(city);
+      } else {
+        const result = await response.json();
+        
+        if (!result.success || !result.data) {
+          throw new Error(result.error || 'Failed to fetch AQI');
+        }
+        
+        aqiData = result.data;
       }
-      
-      const result = await response.json();
-      
-      if (!result.success || !result.data) {
-        throw new Error(result.error || 'Failed to fetch AQI');
-      }
-      
-      // Store the fetched data to MongoDB
-      API.storeAQIToDatabase(result.data);
-      
-      return result.data;
     } catch (error) {
       console.error('Error fetching AQI:', error);
       console.log('Falling back to direct WAQI API...');
-      const data = await API.getAQIDirect(city);
-      // Store to database even from fallback
-      API.storeAQIToDatabase(data);
-      return data;
+      aqiData = await API.getAQIDirect(city);
     }
+    
+    // Store to database once after we have the data (from any source)
+    if (aqiData) {
+      API.storeAQIToDatabase(aqiData).catch(err => 
+        console.warn('Storage failed (non-critical):', err)
+      );
+    }
+    
+    return aqiData;
   },
 
   // Get AQI by coordinates
   getAQIByCoordinates: async (lat, lon) => {
+    let aqiData = null;
+    
     try {
       // Use backend API for better reliability
       const response = await fetch(
@@ -47,30 +51,30 @@ const API = {
       
       if (!response.ok) {
         console.warn('Backend failed, falling back to direct WAQI API...');
-        const data = await API.getAQIByCoordinatesDirect(lat, lon);
-        // Store to database even from fallback
-        API.storeAQIToDatabase(data);
-        return data;
+        aqiData = await API.getAQIByCoordinatesDirect(lat, lon);
+      } else {
+        const result = await response.json();
+        
+        if (!result.success || !result.data) {
+          throw new Error(result.error || 'Cannot get AQI for location');
+        }
+        
+        aqiData = result.data;
       }
-      
-      const result = await response.json();
-      
-      if (!result.success || !result.data) {
-        throw new Error(result.error || 'Cannot get AQI for location');
-      }
-      
-      // Store the fetched data to MongoDB
-      API.storeAQIToDatabase(result.data);
-      
-      return result.data;
     } catch (error) {
       console.error('Error fetching AQI by coordinates:', error);
       console.log('Falling back to direct WAQI API...');
-      const data = await API.getAQIByCoordinatesDirect(lat, lon);
-      // Store to database even from fallback
-      API.storeAQIToDatabase(data);
-      return data;
+      aqiData = await API.getAQIByCoordinatesDirect(lat, lon);
     }
+    
+    // Store to database once after we have the data (from any source)
+    if (aqiData) {
+      API.storeAQIToDatabase(aqiData).catch(err => 
+        console.warn('Storage failed (non-critical):', err)
+      );
+    }
+    
+    return aqiData;
   },
 
   // Fallback: Direct WAQI API for AQI by city
