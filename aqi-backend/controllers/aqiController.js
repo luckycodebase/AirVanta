@@ -249,64 +249,50 @@ exports.storeAQI = async (req, res) => {
     // Calculate category from AQI value
     const category = waqiService.getAQICategory(aqiData.aqi);
 
-    // Check if we already have data for this city today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Upsert exactly one record per city per day, then always update it with latest AQI.
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
-    const existingRecord = await AQIHistory.findOne({
-      city: { $regex: new RegExp(`^${aqiData.city}$`, 'i') },
-      date: { $gte: today }
-    });
+    const sourceLabel = hasPayload ? (source || 'frontend') : 'WAQI';
 
-    if (existingRecord) {
-      console.log(`ℹ️  Data already exists for ${aqiData.city} today - updating instead of creating duplicate`);
-      
-      // Update existing record
-      existingRecord.aqi = aqiData.aqi;
-      existingRecord.category = category;
-      existingRecord.pollutants = aqiData.pollutants;
-      existingRecord.dominantPollutant = aqiData.dominantPollutant;
-      existingRecord.latitude = aqiData.latitude;
-      existingRecord.longitude = aqiData.longitude;
-      existingRecord.country = aqiData.country;
-      existingRecord.lastUpdated = new Date();
-      existingRecord.source = hasPayload ? (source || 'frontend') : 'WAQI';
-      
-      await existingRecord.save();
-      
-      console.log(`✅ Updated AQI data for ${aqiData.city} (Category: ${category}, Source: ${hasPayload ? (source || 'frontend') : 'WAQI'})`);
-      
-      return res.json({
-        success: true,
-        message: 'AQI data updated successfully',
-        data: existingRecord,
-        updated: true
-      });
-    }
+    const updatedRecord = await AQIHistory.findOneAndUpdate(
+      {
+        city: aqiData.city,
+        date: { $gte: todayStart, $lt: tomorrowStart }
+      },
+      {
+        $set: {
+          country: aqiData.country,
+          latitude: aqiData.latitude,
+          longitude: aqiData.longitude,
+          aqi: aqiData.aqi,
+          category,
+          pollutants: aqiData.pollutants,
+          dominantPollutant: aqiData.dominantPollutant,
+          lastUpdated: new Date(),
+          source: sourceLabel
+        },
+        $setOnInsert: {
+          city: aqiData.city,
+          date: hasPayload && aqiData.timestamp ? new Date(aqiData.timestamp) : new Date()
+        }
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true
+      }
+    );
 
-    // Create new AQIHistory record
-    const aqiRecord = new AQIHistory({
-      city: aqiData.city,
-      country: aqiData.country,
-      latitude: aqiData.latitude,
-      longitude: aqiData.longitude,
-      aqi: aqiData.aqi,
-      category: category,
-      pollutants: aqiData.pollutants,
-      dominantPollutant: aqiData.dominantPollutant,
-      date: hasPayload && aqiData.timestamp ? new Date(aqiData.timestamp) : new Date(),
-      source: hasPayload ? (source || 'frontend') : 'WAQI'
-    });
-
-    await aqiRecord.save();
-
-    console.log(`✅ AQI data stored successfully for ${city} (Category: ${category}, Source: ${hasPayload ? (source || 'frontend') : 'WAQI'})`);
+    console.log(`✅ AQI data upserted for ${aqiData.city} (AQI: ${aqiData.aqi}, Category: ${category}, Source: ${sourceLabel})`);
 
     res.json({
       success: true,
-      message: 'AQI data stored successfully',
-      data: aqiRecord,
-      updated: false
+      message: 'AQI data stored/updated successfully',
+      data: updatedRecord,
+      updated: true
     });
 
   } catch (error) {

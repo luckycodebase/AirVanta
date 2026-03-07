@@ -31,9 +31,11 @@ const API = {
     
     // Store to database once after we have the data (from any source)
     if (aqiData) {
-      API.storeAQIToDatabase(aqiData).catch(err => 
-        console.warn('Storage failed (non-critical):', err)
-      );
+      try {
+        await API.storeAQIToDatabase(aqiData);
+      } catch (err) {
+        console.warn('Storage failed (non-critical):', err);
+      }
     }
     
     return aqiData;
@@ -69,9 +71,11 @@ const API = {
     
     // Store to database once after we have the data (from any source)
     if (aqiData) {
-      API.storeAQIToDatabase(aqiData).catch(err => 
-        console.warn('Storage failed (non-critical):', err)
-      );
+      try {
+        await API.storeAQIToDatabase(aqiData);
+      } catch (err) {
+        console.warn('Storage failed (non-critical):', err);
+      }
     }
     
     return aqiData;
