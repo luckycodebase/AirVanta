@@ -164,14 +164,16 @@ const Prediction = {
         ...backendHistory
       ]);
 
-      if (mergedRealHistory.length >= 7) {
+      // If we have any real historical data, use it directly for chart/history display.
+      // Do not backfill with synthetic values because that makes history appear unstable.
+      if (mergedRealHistory.length > 0) {
         Prediction.historicalData = mergedRealHistory;
         console.log(`✅ Loaded ${Prediction.historicalData.length} real historical days for training`);
         return Prediction.historicalData;
       }
 
-      // If real history is too short, use WAQI-driven synthetic fallback
-      console.warn('⚠️ Not enough real history, generating WAQI-based fallback history');
+      // Only when there is absolutely no real history, generate synthetic fallback.
+      console.warn('⚠️ No real history found, generating WAQI-based fallback history');
       const fallbackHistory = await API.generateSyntheticHistoricalData(city, 30);
 
       // Preserve any real backend/local data by date and only fill missing dates with synthetic values
