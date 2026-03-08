@@ -105,6 +105,7 @@ exports.getHistoricalAQI = async (req, res) => {
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - parseInt(days));
+    cutoffDate.setHours(0, 0, 0, 0); // Set to midnight to include full day
 
     // Query database for historical data
     const historicalData = await AQIHistory.find({
@@ -320,6 +321,7 @@ exports.getAQIStatistics = async (req, res) => {
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - parseInt(days));
+    cutoffDate.setHours(0, 0, 0, 0); // Set to midnight to include full day
 
     const historicalData = await AQIHistory.find({
       city: { $regex: new RegExp(city, 'i') },
