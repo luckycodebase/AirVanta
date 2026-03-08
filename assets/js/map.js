@@ -58,7 +58,8 @@ const AQIMap = {
         aqi: data.aqi,
         latitude: data.latitude,
         longitude: data.longitude,
-        timestamp: new Date().toISOString()
+          pollutants: data.pollutants || {},
+          timestamp: new Date().toISOString()
       });
       
       // Update heatmap if enabled
@@ -111,6 +112,7 @@ const AQIMap = {
             aqi: data.aqi,
             latitude: latitude,
             longitude: longitude,
+            pollutants: data.pollutants || {},
             timestamp: new Date().toISOString()
           });
           
