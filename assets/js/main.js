@@ -24,7 +24,7 @@ const App = {
     // Initialize new modules
     if (typeof Advisor !== 'undefined') {
       console.log('Initializing Pollution Advisor...');
-      // Advisor will auto-update when dashboard updates
+      Advisor.init();
     }
     
     if (typeof GlobalRanking !== 'undefined') {
