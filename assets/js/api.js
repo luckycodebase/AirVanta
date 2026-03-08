@@ -466,65 +466,90 @@ const API = {
   getHistoricalData: async (city, days = 30) => {
     try {
       console.log(`📊 Fetching historical data for ${city}...`);
-      const token = 'e52b20dc479791e02b4673f662efb54a4c72d08e';
       
-      // Step 1: Get current location coordinates from WAQI
-      const currentResponse = await fetch(
-        `https://api.waqi.info/feed/${encodeURIComponent(city)}/?token=${token}`
+      // Fetch from MongoDB backend (same source as 7-day trend chart for consistency)
+      const response = await fetch(
+        `http://localhost:5001/api/aqi/history/${encodeURIComponent(city)}?days=${days}`
       );
-      
-      if (!currentResponse.ok) throw new Error('WAQI API Error');
-      
-      const currentData = await currentResponse.json();
-      
-      if (currentData.status !== 'ok' || !currentData.data) {
-        throw new Error('Cannot get location coordinates');
+
+      if (!response.ok) {
+        throw new Error('Backend historical data unavailable');
       }
 
-      const lat = currentData.data.city.geo[0];
-      const lon = currentData.data.city.geo[1];
-      const currentAQI = currentData.data.aqi;
+      const result = await response.json();
+      const backendData = Array.isArray(result?.data) ? result.data : [];
 
-      console.log(`📍 Location: ${city} (${lat}, ${lon}), Current AQI: ${currentAQI}`);
-
-      // Step 2: Fetch REAL historical pollution data from Open-Meteo
-      const realHistoricalData = await API.fetchRealHistoricalData(lat, lon, days);
-      // Step 3: Supplement with current WAQI data for today (more accurate than Open-Meteo)
-      const today = new Date().toISOString().split('T')[0];
-      const todayIndex = realHistoricalData.findIndex(item => item.date === today);
-      
-      if (todayIndex !== -1) {
-        // Replace today's Open-Meteo estimate with actual WAQI reading
-        console.log(`🔄 Replacing today's Open-Meteo AQI (${realHistoricalData[todayIndex].aqi}) with WAQI (${currentAQI})`);
-        realHistoricalData[todayIndex].aqi = currentAQI;
-        realHistoricalData[todayIndex].source = 'WAQI';
-      } else {
-        // Add today's data if not in Open-Meteo response
-        console.log(`➕ Adding today's WAQI data (${currentAQI})`);
-        realHistoricalData.push({
-          date: today,
-          aqi: currentAQI,
-          source: 'WAQI'
-        });
+      if (backendData.length === 0) {
+        throw new Error('No historical data from backend');
       }
 
+      console.log(`✅ Fetched ${backendData.length} days from MongoDB backend`);
 
-      // Format dates for display
-      const formattedData = realHistoricalData.map(item => ({
-        ...item,
-        date: Utils.formatDate(new Date(item.date))
+      // Format the data for chart display
+      const formattedData = backendData.map(item => ({
+        date: Utils.formatDate(new Date(item.date)),
+        aqi: Math.round(Number(item.aqi) || 0),
+        pm25: item.pollutants?.pm25 || null,
+        pm10: item.pollutants?.pm10 || null,
+        o3: item.pollutants?.o3 || null,
+        no2: item.pollutants?.no2 || null,
+        so2: item.pollutants?.so2 || null,
+        co: item.pollutants?.co || null
       }));
-
-      console.log(`✅ Successfully loaded ${formattedData.length} days of REAL historical data`);
 
       return formattedData;
 
     } catch (error) {
       console.error('❌ Error in getHistoricalData:', error);
-      console.warn('⚠️ Falling back to synthetic data generation...');
+      console.warn('⚠️ Falling back to Open-Meteo data...');
       
-      // Fallback: Generate realistic synthetic data
-      return API.generateSyntheticHistoricalData(city, days);
+      try {
+        // Fallback to Open-Meteo if MongoDB unavailable
+        const token = 'e52b20dc479791e02b4673f662efb54a4c72d08e';
+        const currentResponse = await fetch(
+          `https://api.waqi.info/feed/${encodeURIComponent(city)}/?token=${token}`
+        );
+        
+        if (!currentResponse.ok) throw new Error('WAQI API Error');
+        
+        const currentData = await currentResponse.json();
+        
+        if (currentData.status !== 'ok' || !currentData.data) {
+          throw new Error('Cannot get location coordinates');
+        }
+
+        const lat = currentData.data.city.geo[0];
+        const lon = currentData.data.city.geo[1];
+        const currentAQI = currentData.data.aqi;
+
+        console.log(`📍 Location: ${city} (${lat}, ${lon}), Current AQI: ${currentAQI}`);
+
+        // Fetch historical pollution data from Open-Meteo
+        const realHistoricalData = await API.fetchRealHistoricalData(lat, lon, days);
+        
+        // Supplement with current WAQI data for today
+        const today = new Date().toISOString().split('T')[0];
+        const todayIndex = realHistoricalData.findIndex(item => item.date === today);
+        
+        if (todayIndex !== -1) {
+          realHistoricalData[todayIndex].aqi = currentAQI;
+          realHistoricalData[todayIndex].source = 'WAQI';
+        } else {
+          realHistoricalData.push({
+            date: today,
+            aqi: currentAQI,
+            source: 'WAQI'
+          });
+        }
+
+        return realHistoricalData.map(item => ({
+          ...item,
+          date: Utils.formatDate(new Date(item.date))
+        }));
+      } catch (fallbackError) {
+        console.error('❌ Fallback failed:', fallbackError);
+        return [];
+      }
     }
   },
 
