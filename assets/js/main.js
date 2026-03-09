@@ -3,7 +3,13 @@
 const App = {
   // Initialize application
   init: async () => {
-    console.log('Initializing AQI Tracker Application...');
+    console.log('=== AQI Tracker Initializing ===');
+    
+    // CRITICAL: Clear ALL location-related cache
+    console.log('🗑️ Clearing localStorage cache...');
+    localStorage.clear();  // Clear everything to be absolutely sure
+    sessionStorage.clear();
+    console.log('✅ Cache cleared');
     
     // Setup UI elements
     App.setupUI();
@@ -15,6 +21,7 @@ const App = {
     const locationInput = document.getElementById('locationInput');
     if (locationInput && !locationInput.value) {
       locationInput.placeholder = 'Detecting your location...';
+      console.log('📍 Waiting for geolocation...');
     }
     
     // Initialize all systems
@@ -47,7 +54,7 @@ const App = {
     document.getElementById('searchBtn')?.addEventListener('click', () => {
       const location = document.getElementById('locationInput').value;
       if (location.trim()) {
-        AQIMap.searchLocation(location, 'manual');
+        AQIMap.searchLocation(location);
       } else {
         Utils.showNotification('Please enter a location', 'info');
       }
@@ -58,7 +65,7 @@ const App = {
       if (e.key === 'Enter') {
         const location = document.getElementById('locationInput').value;
         if (location.trim()) {
-          AQIMap.searchLocation(location, 'manual');
+          AQIMap.searchLocation(location);
         }
       }
     });
