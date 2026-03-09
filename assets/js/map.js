@@ -148,7 +148,10 @@ const AQIMap = {
           Utils.showNotification('Could not fetch AQI for current location. Loading fallback.', 'error');
           Utils.toggleLoading(false);
           AQIMap.loadFallbackLocation();
-        }❌ Geolocation FAILED:', error.code, error.message);
+        }
+      },
+      (error) => {
+        console.error('❌ Geolocation FAILED:', error.code, error.message);
         if (error.code === 1) {
           console.log('🚫 User DENIED location permission');
           Utils.showNotification('Location access denied. Using IP-based location.', 'warning');
@@ -157,9 +160,6 @@ const AQIMap = {
         } else if (error.code === 3) {
           console.log('⏱️ Geolocation timeout');
         }
-      (error) => {
-        console.error('Geolocation error:', error);
-        Utils.showNotification('Unable to get your location. Loading saved/default location.', 'info');
         Utils.toggleLoading(false);
         AQIMap.loadFallbackLocation();
       },
@@ -167,7 +167,14 @@ const AQIMap = {
         enableHighAccuracy: true,
         timeout: 10000,
         maximumAge: 0  // No GPS cache - always get fresh location
-      }ole.log('🔄 loadFallbackLocation() - GPS failed, trying alternatives...');
+      }
+    );
+  },
+
+  // Fallback when auto geolocation fails: prefer IP city, then a neutral default
+  loadFallbackLocation: async () => {
+    try {
+      console.log('🔄 loadFallbackLocation() - GPS failed, trying alternatives...');
       const locationInput = document.getElementById('locationInput');
 
       // 1) Prefer approximate current city from network IP to avoid sticky old search city
@@ -189,12 +196,15 @@ const AQIMap = {
       }
       await AQIMap.searchLocation(fallbackCity);
     } catch (error) {
-      console.error('❌ lback: neutral default city (avoid stale last searched city)
-      const fallbackCity = 'New York';
-      if (locationInput) {
-        locationInput.value = fallbackCity;
-      }
-      awaiole.log('🌐 Fetching IP-based location from ipapi.co...');
+      console.error('Fallback location load failed:', error);
+      Utils.showNotification('Failed to load fallback location data', 'error');
+    }
+  },
+
+  // Approximate location fallback (no browser geolocation permission needed)
+  getIPBasedCity: async () => {
+    try {
+      console.log('🌐 Fetching IP-based location from ipapi.co...');
       const response = await fetch('https://ipapi.co/json/');
       if (!response.ok) {
         console.log('❌ IP lookup API returned error');
@@ -206,17 +216,7 @@ const AQIMap = {
       console.log(`✅ IP City: ${city || 'null'}`);
       return city;
     } catch (error) {
-      console.warn('❌ 
-
-  // Approximate location fallback (no browser geolocation permission needed)
-  getIPBasedCity: async () => {
-    try {
-      const response = await fetch('https://ipapi.co/json/');
-      if (!response.ok) return null;
-      const data = await response.json();
-      return data?.city || null;
-    } catch (error) {
-      console.warn('IP-based location lookup failed:', error);
+      console.warn('❌ IP-based location lookup failed:', error);
       return null;
     }
   },
