@@ -21,7 +21,7 @@ const Chatbot = {
   // Create chatbot UI
   createChatbotUI: () => {
     const chatbotHTML = `
-      <div id="chatbot" class="chatbot-container">
+      <div id="chatbot" class="chatbot-container hidden">
         <div class="chatbot-header">
           <div class="chatbot-title">
             <i class="fas fa-robot"></i>
@@ -102,8 +102,8 @@ const Chatbot = {
   toggleChatbot: () => {
     const chatbot = document.getElementById('chatbot');
     if (chatbot) {
-      chatbot.classList.toggle('active');
-      Chatbot.isOpen = chatbot.classList.contains('active');
+      chatbot.classList.toggle('hidden');
+      Chatbot.isOpen = !Chatbot.isOpen;
       
       if (Chatbot.isOpen) {
         document.getElementById('chatInput')?.focus();
