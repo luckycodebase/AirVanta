@@ -1,6 +1,6 @@
-# Airlytics - Backend API
+# airvanta - Backend API
 
-Complete Node.js + Express backend for Airlytics Environmental Monitoring Dashboard. Provides real-time air quality data, historical pollution tracking, machine learning-based predictions, plant recommendations, and exposure risk calculations.
+Complete Node.js + Express backend for airvanta Environmental Monitoring Dashboard. Provides real-time air quality data, historical pollution tracking, machine learning-based predictions, plant recommendations, and exposure risk calculations.
 
 ## 🌟 Features
 
