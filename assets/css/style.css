@@ -157,8 +157,8 @@ textarea {
 }
 
 .brand-logo {
-    width: 44px;
-    height: 44px;
+    width: 64px;
+    height: 64px;
     object-fit: contain;
     border-radius: 10px;
 }
@@ -2491,8 +2491,8 @@ PLANTS SECTION
 }
 
 .footer-brand-logo {
-    width: 32px;
-    height: 32px;
+    width: 46px;
+    height: 46px;
     object-fit: contain;
     border-radius: 8px;
 }
@@ -2642,8 +2642,8 @@ PLANTS SECTION
     }
 
     .brand-logo {
-        width: 38px;
-        height: 38px;
+        width: 52px;
+        height: 52px;
     }
 
     .search-box {
