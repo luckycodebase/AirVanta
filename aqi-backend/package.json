@@ -1,7 +1,7 @@
 {
   "name": "airvanta-backend",
   "version": "1.0.0",
-  "description": "Backend API for airvanta Environmental Intelligence Dashboard",
+  "description": "Backend API for AirVanta Environmental Intelligence Dashboard",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
