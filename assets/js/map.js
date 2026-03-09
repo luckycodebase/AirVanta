@@ -137,7 +137,9 @@ const AQIMap = {
         const code = error?.code;
         console.error('❌ Geolocation FAILED:', code, error?.message || error);
         if (code === 1) {
-          Utils.showNotification('Location access denied. Loading saved/default location.', 'warning');
+          // Permission denied: drop saved location so stale coordinates are not repeatedly forced.
+          Utils.storage.remove('lastLocation');
+          Utils.showNotification('Location access denied. Loading default location.', 'warning');
         } else {
           Utils.showNotification('Unable to detect current location. Loading saved/default location.', 'info');
         }
@@ -151,9 +153,13 @@ const AQIMap = {
     try {
       const locationInput = document.getElementById('locationInput');
       const lastLocation = Utils.storage.get('lastLocation', null);
+      const lastTimestamp = lastLocation?.timestamp ? new Date(lastLocation.timestamp).getTime() : 0;
+      const maxFallbackAgeMs = 24 * 60 * 60 * 1000; // 24 hours
+      const isRecentSavedLocation = Number.isFinite(lastTimestamp) && (Date.now() - lastTimestamp) <= maxFallbackAgeMs;
 
       if (
         lastLocation &&
+        isRecentSavedLocation &&
         Number.isFinite(lastLocation.latitude) &&
         Number.isFinite(lastLocation.longitude)
       ) {
@@ -179,16 +185,6 @@ const AQIMap = {
         if (typeof GlobalRanking !== 'undefined') {
           GlobalRanking.displayUserComparison(data.city, data.aqi);
         }
-
-        Utils.storage.set('lastLocation', {
-          city: data.city,
-          stationCity: data.stationCity || data.city,
-          aqi: data.aqi,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          pollutants: data.pollutants || {},
-          timestamp: new Date().toISOString()
-        });
 
         await AQIMap.updateHeatmap(data.latitude, data.longitude);
         return;
