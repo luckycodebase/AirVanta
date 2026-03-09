@@ -23,7 +23,12 @@ const AQIMap = {
     }).addTo(AQIMap.map);
 
     // Add geolocation button
-    document.getElementById('geoBtn').addEventListener('click', AQIMap.getCurrentLocation);
+    document.getElementById('geoBtn')?.addEventListener('click', AQIMap.getCurrentLocation);
+
+    const locationInput = document.getElementById('locationInput');
+    if (locationInput) {
+      locationInput.value = 'Detecting your location...';
+    }
 
     // Get initial location
     AQIMap.getCurrentLocation();
@@ -75,26 +80,37 @@ const AQIMap = {
 
   // Get current location
   getCurrentLocation: () => {
-    if (navigator.geolocation) {
-      Utils.toggleLoading(true);
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
+    if (!navigator.geolocation) {
+      Utils.showNotification('Geolocation not supported. Loading saved/default location.', 'info');
+      AQIMap.loadFallbackLocation();
+      return;
+    }
+
+    Utils.toggleLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
           const { latitude, longitude } = position.coords;
           const data = await API.getAQIByCoordinates(latitude, longitude);
           const stationCity = data.city;
-          
-          // Get location name
+
+          // Get location name (fallback to station city if reverse-geocode fails)
           const locationName = await Utils.getLocationName(latitude, longitude);
-          data.city = locationName;
+          const resolvedCity = locationName || stationCity || 'Current Location';
+
+          data.city = resolvedCity;
           data.stationCity = stationCity;
-          
-          document.getElementById('locationInput').value = locationName;
+
+          const locationInput = document.getElementById('locationInput');
+          if (locationInput) {
+            locationInput.value = resolvedCity;
+          }
+
           AQIMap.updateMap(data);
           await Dashboard.updateDashboard(data);
           await Charts.updateAll(data);
           PlantRecommendation.updateRecommendations(data);
-          
-          // Update new modules
+
           if (typeof Advisor !== 'undefined') {
             Advisor.updateAdvisor(data);
           }
@@ -104,31 +120,77 @@ const AQIMap = {
           if (typeof GlobalRanking !== 'undefined') {
             GlobalRanking.displayUserComparison(data.city, data.aqi);
           }
-          
-          // Save location with coordinates
+
           Utils.storage.set('lastLocation', {
-            city: locationName,
+            city: resolvedCity,
             stationCity: stationCity,
             aqi: data.aqi,
-            latitude: latitude,
-            longitude: longitude,
+            latitude,
+            longitude,
             pollutants: data.pollutants || {},
             timestamp: new Date().toISOString()
           });
-          
-          // Update heatmap if enabled
+
           await AQIMap.updateHeatmap(latitude, longitude);
-          
           Utils.toggleLoading(false);
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
-          Utils.showNotification('Unable to get your location', 'error');
+        } catch (error) {
+          console.error('Error resolving current location AQI:', error);
+          Utils.showNotification('Could not fetch AQI for current location. Loading fallback.', 'error');
           Utils.toggleLoading(false);
+          AQIMap.loadFallbackLocation();
         }
-      );
-    } else {
-      Utils.showNotification('Geolocation not supported', 'error');
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        Utils.showNotification('Unable to get your location. Loading saved/default location.', 'info');
+        Utils.toggleLoading(false);
+        AQIMap.loadFallbackLocation();
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0  // No GPS cache - always get fresh location
+      }
+    );
+  },
+
+  // Fallback when auto geolocation fails: prefer IP city, then a neutral default
+  loadFallbackLocation: async () => {
+    try {
+      const locationInput = document.getElementById('locationInput');
+
+      // 1) Prefer approximate current city from network IP to avoid sticky old search city
+      const ipCity = await AQIMap.getIPBasedCity();
+      if (ipCity) {
+        if (locationInput) {
+          locationInput.value = ipCity;
+        }
+        await AQIMap.searchLocation(ipCity);
+        return;
+      }
+
+      // 2) Final fallback: neutral default city (avoid stale last searched city)
+      const fallbackCity = 'New York';
+      if (locationInput) {
+        locationInput.value = fallbackCity;
+      }
+      await AQIMap.searchLocation(fallbackCity);
+    } catch (error) {
+      console.error('Fallback location load failed:', error);
+      Utils.showNotification('Failed to load fallback location data', 'error');
+    }
+  },
+
+  // Approximate location fallback (no browser geolocation permission needed)
+  getIPBasedCity: async () => {
+    try {
+      const response = await fetch('https://ipapi.co/json/');
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data?.city || null;
+    } catch (error) {
+      console.warn('IP-based location lookup failed:', error);
+      return null;
     }
   },
 

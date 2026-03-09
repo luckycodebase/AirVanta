@@ -5,16 +5,19 @@ const App = {
   init: async () => {
     console.log('Initializing AQI Tracker Application...');
     
+    // CRITICAL: Clear old location cache to prevent sticky Jaipur issue
+    localStorage.removeItem('lastLocation');
+    
     // Setup UI elements
     App.setupUI();
     App.setupDarkMode();
     App.setupNavigation();
     
     // Load initial data
-    const lastLocation = Utils.storage.get('lastLocation');
-    if (lastLocation) {
-      document.getElementById('locationInput').value = lastLocation.city;
-      // Could load this data, but let map handle it
+    // Don't pre-fill location - let map auto-detect current location
+    const locationInput = document.getElementById('locationInput');
+    if (locationInput && !locationInput.value) {
+      locationInput.placeholder = 'Detecting your location...';
     }
     
     // Initialize all systems
