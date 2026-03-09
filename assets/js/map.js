@@ -30,8 +30,8 @@ const AQIMap = {
       locationInput.value = 'Detecting your location...';
     }
 
-    // Get initial location - Use IP-based first for reliability
-    AQIMap.loadFallbackLocation();
+    // Get initial location using browser GPS first, then IP fallback
+    AQIMap.getCurrentLocation();
   },
 
   // Search location
@@ -96,16 +96,43 @@ const AQIMap = {
         try {
           const { latitude, longitude } = position.coords;
           console.log(`✅ GPS SUCCESS: ${latitude}, ${longitude}`);
-          
-          const data = await API.getAQIByCoordinates(latitude, longitude);
+
+          // Validate GPS against IP-based coarse location and auto-correct if mismatch is very large.
+          let selectedLat = latitude;
+          let selectedLon = longitude;
+          let selectedSource = 'gps';
+
+          const ipLocation = await AQIMap.getIPBasedLocation();
+          if (
+            ipLocation?.latitude !== null &&
+            ipLocation?.longitude !== null
+          ) {
+            const driftKm = AQIMap.calculateDistanceKm(
+              latitude,
+              longitude,
+              ipLocation.latitude,
+              ipLocation.longitude
+            );
+
+            console.log(`📏 GPS vs IP drift: ${driftKm.toFixed(1)} km`);
+
+            if (driftKm > 250) {
+              selectedLat = ipLocation.latitude;
+              selectedLon = ipLocation.longitude;
+              selectedSource = 'ip';
+              console.warn('⚠️ Large GPS/IP mismatch detected. Using IP location for this session.');
+            }
+          }
+
+          const data = await API.getAQIByCoordinates(selectedLat, selectedLon);
           console.log('📡 WAQI API returned station:', data.city);
           const stationCity = data.city;
 
           // Get location name (fallback to station city if reverse-geocode fails)
-          const locationName = await Utils.getLocationName(latitude, longitude);
+          const locationName = await Utils.getLocationName(selectedLat, selectedLon);
           console.log('🏙️ Reverse geocode returned:', locationName);
           const resolvedCity = locationName || stationCity || 'Current Location';
-          console.log(`✅ FINAL CITY: ${resolvedCity} (station: ${stationCity})`);
+          console.log(`✅ FINAL CITY: ${resolvedCity} (station: ${stationCity}, source: ${selectedSource})`);
 
           data.city = resolvedCity;
           data.stationCity = stationCity;
@@ -135,13 +162,13 @@ const AQIMap = {
             city: resolvedCity,
             stationCity: stationCity,
             aqi: data.aqi,
-            latitude,
-            longitude,
+            latitude: selectedLat,
+            longitude: selectedLon,
             pollutants: data.pollutants || {},
             timestamp: new Date().toISOString()
           });
 
-          await AQIMap.updateHeatmap(latitude, longitude);
+          await AQIMap.updateHeatmap(selectedLat, selectedLon);
           Utils.toggleLoading(false);
         } catch (error) {
           console.error('Error resolving current location AQI:', error);
@@ -177,14 +204,45 @@ const AQIMap = {
       console.log('🔄 loadFallbackLocation() - GPS failed, trying alternatives...');
       const locationInput = document.getElementById('locationInput');
 
-      // 1) Prefer approximate current city from network IP to avoid sticky old search city
-      const ipCity = await AQIMap.getIPBasedCity();
-      if (ipCity) {
-        console.log(`🌐 IP-based location: ${ipCity}`);
+      // 1) Prefer approximate current location from network IP
+      const ipLocation = await AQIMap.getIPBasedLocation();
+      if (ipLocation?.latitude !== null && ipLocation?.longitude !== null) {
+        const ipCity = ipLocation.city || 'Current Location';
+        console.log(`🌐 IP-based location: ${ipCity} (${ipLocation.latitude}, ${ipLocation.longitude})`);
         if (locationInput) {
           locationInput.value = ipCity;
         }
-        await AQIMap.searchLocation(ipCity);
+
+        const data = await API.getAQIByCoordinates(ipLocation.latitude, ipLocation.longitude);
+        data.city = ipCity;
+        data.stationCity = data.stationCity || data.city;
+
+        AQIMap.updateMap(data);
+        await Dashboard.updateDashboard(data);
+        await Charts.updateAll(data);
+        PlantRecommendation.updateRecommendations(data);
+
+        if (typeof Advisor !== 'undefined') {
+          Advisor.updateAdvisor(data);
+        }
+        if (typeof Chatbot !== 'undefined') {
+          Chatbot.updateContext(data);
+        }
+        if (typeof GlobalRanking !== 'undefined') {
+          GlobalRanking.displayUserComparison(data.city, data.aqi);
+        }
+
+        Utils.storage.set('lastLocation', {
+          city: data.city,
+          stationCity: data.stationCity || data.city,
+          aqi: data.aqi,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          pollutants: data.pollutants || {},
+          timestamp: new Date().toISOString()
+        });
+
+        await AQIMap.updateHeatmap(data.latitude, data.longitude);
         return;
       }
 
@@ -202,23 +260,47 @@ const AQIMap = {
   },
 
   // Approximate location fallback (no browser geolocation permission needed)
-  getIPBasedCity: async () => {
+  getIPBasedLocation: async () => {
     try {
       console.log('🌐 Fetching IP-based location from ipapi.co...');
       const response = await fetch('https://ipapi.co/json/');
       if (!response.ok) {
         console.log('❌ IP lookup API returned error');
-        return null;
+        return { city: null, latitude: null, longitude: null };
       }
       const data = await response.json();
       console.log('📡 IP lookup result:', data);
       const city = data?.city || null;
-      console.log(`✅ IP City: ${city || 'null'}`);
-      return city;
+      const latitude = Number(data?.latitude);
+      const longitude = Number(data?.longitude);
+      console.log(`✅ IP Location: ${city || 'null'} (${latitude}, ${longitude})`);
+
+      return {
+        city,
+        latitude: Number.isFinite(latitude) ? latitude : null,
+        longitude: Number.isFinite(longitude) ? longitude : null
+      };
     } catch (error) {
       console.warn('❌ IP-based location lookup failed:', error);
-      return null;
+      return { city: null, latitude: null, longitude: null };
     }
+  },
+
+  // Haversine distance in kilometers between two coordinates
+  calculateDistanceKm: (lat1, lon1, lat2, lon2) => {
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const earthRadiusKm = 6371;
+
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadiusKm * c;
   },
 
   // Update map with AQI data
