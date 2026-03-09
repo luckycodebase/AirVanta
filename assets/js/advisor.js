@@ -6,7 +6,6 @@ const Advisor = {
 
   // Initialize advisor
   init: () => {
-    console.log('Pollution Advisor initialized');
   },
 
   // Update advisor with current AQI data

@@ -19,6 +19,12 @@ const Charts = {
 
   // Initialize all charts
   initCharts: async (locationData = null) => {
+    const currentData = locationData || Utils.storage.get('lastLocation');
+    if (!currentData?.city && !currentData?.stationCity) {
+      Charts.displayEmptyPollutantChart();
+      return;
+    }
+
     await Charts.createAQITrendChart(locationData);
     await Charts.createPollutantChart(locationData);
     await Charts.createHourlyChart(locationData);
@@ -31,7 +37,8 @@ const Charts = {
     if (!ctx) return;
 
     const currentData = locationData || Utils.storage.get('lastLocation');
-    const city = currentData?.stationCity || currentData?.city || 'Unknown';
+    const city = currentData?.stationCity || currentData?.city;
+    if (!city) return;
     let data = [];
 
     try {
@@ -149,7 +156,6 @@ const Charts = {
 
       // Fallback to latest stored backend data when the live payload has no pollutant values.
       if (!hasRealPollutants) {
-        console.log(`⚠️ No pollutant values in current payload for ${city}; trying backend history...`);
         try {
           const response = await fetch(
             `http://localhost:5001/api/aqi/history/${encodeURIComponent(city)}?days=1`
@@ -172,7 +178,6 @@ const Charts = {
       const pollutantKeys = ['pm25', 'pm10', 'o3', 'no2', 'co', 'so2'];
       const pollutantValues = pollutantKeys.map(key => Math.round(Number(pollutants[key]) || 0));
 
-      console.log(`✅ Pollutant values: PM2.5=${pollutantValues[0]}, PM10=${pollutantValues[1]}, O₃=${pollutantValues[2]}, NO₂=${pollutantValues[3]}, CO=${pollutantValues[4]}, SO₂=${pollutantValues[5]}`);
 
       if (Charts.instances.pollutant) {
         Charts.instances.pollutant.destroy();
@@ -268,8 +273,8 @@ const Charts = {
 
     // Get current location for hourly data
     const currentData = locationData || Utils.storage.get('lastLocation');
-    const lat = currentData?.lat || 40.7128; // Default NYC
-    const lon = currentData?.lon || -74.0060;
+    const lat = Number(currentData?.latitude) || 40.7128; // Default NYC
+    const lon = Number(currentData?.longitude) || -74.0060;
 
     try {
       const data = await API.getHourlyData(lat, lon);
@@ -325,7 +330,8 @@ const Charts = {
 
     try {
       const currentData = locationData || Utils.storage.get('lastLocation');
-      const city = currentData?.stationCity || currentData?.city || 'Unknown';
+      const city = currentData?.stationCity || currentData?.city;
+      if (!city) return;
       
       const data = await API.getHistoricalData(city, 30);
 

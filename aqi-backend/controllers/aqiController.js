@@ -116,9 +116,19 @@ exports.getHistoricalAQI = async (req, res) => {
     .lean();
 
     if (historicalData.length === 0) {
-      return res.status(404).json({
-        error: `No historical data found for ${city}`,
-        message: 'Historical data may not be available yet. It will be collected daily.'
+      return res.json({
+        success: true,
+        city,
+        days: parseInt(days),
+        statistics: {
+          count: 0,
+          average: null,
+          min: null,
+          max: null,
+          latestAQI: null
+        },
+        data: [],
+        message: `No historical data found for ${city} yet.`
       });
     }
 

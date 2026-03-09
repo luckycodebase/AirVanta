@@ -145,6 +145,33 @@ const Utils = {
     }
   },
 
+  // Get precise device coordinates using browser geolocation.
+  getDeviceCoordinates: (options = {}) => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported by this browser.'));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          });
+        },
+        (error) => {
+          reject(error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: options.timeout || 10000,
+          maximumAge: options.maximumAge || 0
+        }
+      );
+    });
+  },
+
   // localStorage helpers
   storage: {
     set: (key, value) => {

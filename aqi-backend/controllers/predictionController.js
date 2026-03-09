@@ -52,6 +52,19 @@ exports.getPredictions = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error in getPredictions:', error.message);
+
+    // Treat insufficient history as an expected state, not a server failure.
+    if ((error.message || '').toLowerCase().includes('insufficient historical data')) {
+      return res.json({
+        success: false,
+        city: req.params.city,
+        predictions: [],
+        model: null,
+        message: error.message,
+        fallbackRecommended: true
+      });
+    }
+
     res.status(500).json({
       error: error.message || 'Failed to generate predictions'
     });

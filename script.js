@@ -7,8 +7,6 @@ window.addEventListener('load', () => {
         const iframe = document.querySelector('#live-aqi iframe');
         iframe.src = savedMapUrl;
 
-        console.log("Loaded saved location:", savedLocation);
-        console.log("Loaded saved map URL:", savedMapUrl);
     }
 });
 
@@ -19,10 +17,7 @@ document.getElementById('get-aqi').addEventListener('click', () => {
         return;
     }
 
-    
-    console.log("Entered location:", location);
 
-    
     const iframe = document.querySelector('#live-aqi iframe');
     const mapUrl = `https://www.aqicn.org/map/${encodeURIComponent(location)}/`;
     iframe.src = mapUrl;
@@ -31,10 +26,7 @@ document.getElementById('get-aqi').addEventListener('click', () => {
     localStorage.setItem('location', location);
     localStorage.setItem('mapUrl', mapUrl);
 
-    
-    console.log("Updated iframe URL:", mapUrl);
 
-    
     fetch(`https://api.waqi.info/feed/${encodeURIComponent(location)}/?token=e52b20dc479791e02b4673f662efb54a4c72d08e`)
         .then(response => {
             if (!response.ok) {
@@ -43,9 +35,6 @@ document.getElementById('get-aqi').addEventListener('click', () => {
             return response.json();
         })
         .then(data => {
-            
-            console.log("Fetched AQI data:", data);
-
             if (!data || !data.data || !data.data.aqi) {
                 throw new Error("Invalid AQI data received");
             }

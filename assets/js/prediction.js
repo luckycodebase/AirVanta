@@ -7,6 +7,7 @@ const Prediction = {
   initialized: false,
   activeRequestId: 0,
   currentCity: null,
+  minBackendHistoryDays: 15,
 
   // Normalize city strings for tolerant matching (station names vs typed city names)
   normalizeCityName: (value) => (value || '')
@@ -70,8 +71,9 @@ const Prediction = {
 
     // Auto-load forecast on startup when location is available
     const lastLocation = Utils.storage.get('lastLocation');
-    if (lastLocation?.city) {
-      Prediction.generateAndDisplayForecast('aqi', lastLocation.city);
+    const startupCity = (lastLocation?.stationCity || lastLocation?.city || '').toString().trim();
+    if (startupCity && startupCity.toLowerCase() !== 'unknown') {
+      Prediction.generateAndDisplayForecast('aqi', startupCity);
     }
   },
 
@@ -105,7 +107,6 @@ const Prediction = {
       }
       
       Utils.storage.set('aqi_history', JSON.stringify(history));
-      console.log(`✅ Stored today's AQI (${currentAQI}) for ${city}`);
       return history;
     } catch (error) {
       console.error('Error collecting historical AQI:', error);
@@ -131,7 +132,6 @@ const Prediction = {
   // Build historical dataset for training using WAQI/local history only
   fetchHistoricalForTraining: async (city) => {
     try {
-      console.log(`🔄 Preparing historical training data for ${city}...`);
 
       // Load fresh data from localStorage
       Prediction.loadStoredHistory();
@@ -141,7 +141,6 @@ const Prediction = {
         .filter(item => item && item.city && Prediction.cityMatches(item.city, city))
         .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-      console.log(`📊 Found ${cityHistory.length} local historical entries for ${city}`);
 
       // Try backend MongoDB historical data first (authoritative source)
       let backendHistory = [];
@@ -152,7 +151,6 @@ const Prediction = {
         if (response.ok) {
           const result = await response.json();
           backendHistory = Array.isArray(result?.data) ? result.data : [];
-          console.log(`📦 Found ${backendHistory.length} backend historical entries for ${city}`);
         }
       } catch (backendError) {
         console.warn('⚠️ Backend historical data unavailable, using local/fallback data.');
@@ -168,7 +166,6 @@ const Prediction = {
       // Do not backfill with synthetic values because that makes history appear unstable.
       if (mergedRealHistory.length > 0) {
         Prediction.historicalData = mergedRealHistory;
-        console.log(`✅ Loaded ${Prediction.historicalData.length} real historical days for training`);
         return Prediction.historicalData;
       }
 
@@ -180,7 +177,6 @@ const Prediction = {
       Prediction.historicalData = fallbackHistory.map(d => {
         const realData = mergedRealHistory.find(h => h.date === d.date);
         if (realData) {
-          console.log(`📌 Using real AQI data for ${d.date}: ${realData.aqi} (instead of synthetic ${d.aqi})`);
           return {
             date: realData.date,
             aqi: realData.aqi,
@@ -195,11 +191,9 @@ const Prediction = {
         };
       });
 
-      console.log(`✅ Generated ${Prediction.historicalData.length} fallback days for ${city} (with real data preserved)`);
       return Prediction.historicalData;
     } catch (error) {
       console.error('❌ Error preparing training data:', error);
-      console.log('⚠️ Falling back to localStorage history');
       Prediction.loadStoredHistory();
       Prediction.historicalData = (Prediction.historicalData || [])
         .filter(item => item && item.city && Prediction.cityMatches(item.city, city));
@@ -373,7 +367,6 @@ const Prediction = {
       
       // If insufficient data, fetch from API
       if (trainingData.length < 7) {
-        console.log('Fetching historical data from API...');
         // Note: This would need to be made async in actual implementation
         // For now, we'll use what we have
       }
@@ -722,18 +715,41 @@ const Prediction = {
 
       // Get current city from last location
       const lastLocation = Utils.storage.get('lastLocation');
-      const city = cityOverride || lastLocation?.stationCity || lastLocation?.city || 'Unknown';
+      let city = cityOverride || lastLocation?.stationCity || lastLocation?.city || 'Unknown';
+
+      if (!city || city.toLowerCase() === 'unknown' || city.toLowerCase() === 'unknown location') {
+        try {
+          const coords = await Utils.getDeviceCoordinates({ timeout: 10000, maximumAge: 0 });
+          const aqiData = await API.getAQIByCoordinates(coords.latitude, coords.longitude);
+          const locationName = await Utils.getLocationName(coords.latitude, coords.longitude);
+
+          city = locationName || aqiData.stationCity || aqiData.city || 'Unknown';
+          if (city && city.toLowerCase() !== 'unknown' && city.toLowerCase() !== 'unknown location') {
+            Utils.storage.set('lastLocation', {
+              city,
+              stationCity: aqiData.stationCity || aqiData.city || city,
+              aqi: aqiData.aqi,
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+              pollutants: aqiData.pollutants || {},
+              timestamp: new Date().toISOString()
+            });
+          }
+        } catch (locationError) {
+          console.warn('Skipping forecast generation: valid city is not available yet.', locationError);
+          Utils.toggleLoading(false);
+          return;
+        }
+      }
+
       Prediction.currentCity = city;
 
-      console.log(`🎯 Starting forecast generation for ${city} (Request #${requestId})`);
 
       // STEP 1: Prepare historical data for this city
-      console.log(`📊 Loading historical training data for ${city}...`);
       await Prediction.fetchHistoricalForTraining(city);
 
       // Abort if a newer request started (e.g., rapid city changes)
       if (requestId !== Prediction.activeRequestId) {
-        console.log(`⚠️ Aborting stale request #${requestId}, newer request in progress`);
         Utils.toggleLoading(false);
         return;
       }
@@ -742,13 +758,11 @@ const Prediction = {
       const historicalData = Prediction.prepareHistoricalData(Prediction.historicalData);
       Prediction.historicalData = historicalData;
 
-      console.log(`📋 Prepared ${historicalData.length} historical days for ${city}`);
       
       // Log today's AQI for debugging
       const today = Utils.formatDate(new Date());
       const todayData = historicalData.find(h => h.date === today);
       if (todayData) {
-        console.log(`📌 Today's AQI for ${city}: ${todayData.aqi}`);
       }
 
       if (historicalData.length === 0) {
@@ -760,7 +774,10 @@ const Prediction = {
 
       // STEP 2: Prefer backend DB-trained predictions; fallback to frontend model
       let predictions = [];
-      const backendResult = await Prediction.fetchBackendPredictions(city, 30);
+      const shouldUseBackendModel = historicalData.length >= Prediction.minBackendHistoryDays;
+      const backendResult = shouldUseBackendModel
+        ? await Prediction.fetchBackendPredictions(city, 30)
+        : null;
 
       if (backendResult) {
         // Backend currently returns AQI series only; derive PM values for existing UI toggle support.
@@ -785,12 +802,10 @@ const Prediction = {
           source: 'database'
         };
       } else {
-        console.log(`🤖 Training linear regression model on ${Prediction.historicalData.length} days of data...`);
         predictions = Prediction.predictFutureAQI(30, lastHistoricalDate);
       }
 
       // STEP 4: Create chart with both historical and predictions
-      console.log(`📈 Rendering ${city} forecast: ${historicalData.length} historical + ${predictions.length} predicted days`);
       Prediction.createForecastChart(historicalData, predictions, type);
 
       // STEP 5: Update dangerous days warning
@@ -825,7 +840,6 @@ const Prediction = {
         }
       }
 
-      console.log(`✅ Forecast for ${city} generated successfully (Request #${requestId})`);
       Utils.toggleLoading(false);
     } catch (error) {
       console.error('❌ Error generating forecast:', error);

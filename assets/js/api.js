@@ -25,7 +25,6 @@ const API = {
       }
     } catch (error) {
       console.error('Error fetching AQI:', error);
-      console.log('Falling back to direct WAQI API...');
       aqiData = await API.getAQIDirect(city);
     }
     
@@ -65,7 +64,6 @@ const API = {
       }
     } catch (error) {
       console.error('Error fetching AQI by coordinates:', error);
-      console.log('Falling back to direct WAQI API...');
       aqiData = await API.getAQIByCoordinatesDirect(lat, lon);
     }
     
@@ -351,7 +349,6 @@ const API = {
   // Fetch real historical pollution data from Open-Meteo Air Quality API
   fetchRealHistoricalData: async (lat, lon, days = 30) => {
     try {
-      console.log(`Fetching real historical data for lat=${lat}, lon=${lon}, past_days=${days}`);
       
       const response = await fetch(
         `https://air-quality-api.open-meteo.com/v1/air-quality?` +
@@ -370,9 +367,6 @@ const API = {
         throw new Error('No historical data available');
       }
 
-      console.log(`✅ Received ${data.hourly.time.length} hours of real pollution data`);
-  console.log('ℹ️ AQI Calculation: Using EPA standard for all pollutants (PM2.5, PM10, NO₂, SO₂, O₃, CO)');
-  console.log('ℹ️ Final AQI = Maximum of all individual pollutant AQIs (worst pollutant drives the rating)');
 
 
       // Process hourly data into daily averages
@@ -445,13 +439,10 @@ const API = {
         });
       });
 
-      console.log(`✅ Processed ${historicalDataset.length} days of historical AQI data`);
       
       // Show detailed sample with dominant pollutants
       const sampleData = historicalDataset.slice(-5);
-      console.log('📊 Last 5 days of data (Open-Meteo source):');
       sampleData.forEach(day => {
-        console.log(`  ${day.date}: AQI ${day.aqi} (driven by ${day.dominantPollutant})`);
       });
 
       return historicalDataset;
@@ -465,7 +456,12 @@ const API = {
   // Get historical data - NOW USES REAL API DATA
   getHistoricalData: async (city, days = 30) => {
     try {
-      console.log(`📊 Fetching historical data for ${city}...`);
+      const normalizedCity = (city || '').toString().trim();
+      if (!normalizedCity || normalizedCity.toLowerCase() === 'unknown' || normalizedCity.toLowerCase() === 'unknown location') {
+        console.warn('Skipping historical fetch: city is not resolved yet.');
+        return [];
+      }
+
       
       // PRIMARY: Fetch from MongoDB backend (authoritative source, stored AQI)
       const response = await fetch(
@@ -477,7 +473,6 @@ const API = {
         const backendData = Array.isArray(result?.data) ? result.data : [];
 
         if (backendData.length > 0) {
-          console.log(`✅ Fetched ${backendData.length} days from MongoDB backend`);
 
           // Format the data for chart display
           const formattedData = backendData.map(item => ({
@@ -495,7 +490,6 @@ const API = {
         }
       }
 
-      console.log(`⚠️ MongoDB unavailable for ${city}, falling back to Open-Meteo...`);
       
       // FALLBACK: Use Open-Meteo if MongoDB has no data
       const token = 'e52b20dc479791e02b4673f662efb54a4c72d08e';
@@ -517,7 +511,6 @@ const API = {
       const lon = currentData.data.city.geo[1];
       const currentAQI = currentData.data.aqi;
 
-      console.log(`📍 Location: ${city} (${lat}, ${lon}), Current AQI: ${currentAQI}`);
 
       // Fetch historical pollution data from Open-Meteo
       const realHistoricalData = await API.fetchRealHistoricalData(lat, lon, days);
@@ -543,7 +536,6 @@ const API = {
         date: Utils.formatDate(new Date(item.date))
       }));
 
-      console.log(`✅ Successfully loaded ${formattedData.length} days of Open-Meteo data`);
 
       return formattedData;
 
@@ -587,7 +579,6 @@ const API = {
         // For TODAY, use exact current AQI without variations
         if (i === 0) {
           aqi = currentAQI;
-          console.log(`📍 Using exact current AQI for today: ${aqi}`);
         } else {
           // For past days, generate variations
           const dayOfWeek = date.getDay();
@@ -606,7 +597,6 @@ const API = {
         });
       }
       
-      console.log(`⚠️ Generated ${data.length} days of synthetic data (today's AQI: ${currentAQI})`);
       return data;
       
     } catch (error) {
@@ -714,7 +704,6 @@ const API = {
 
       const result = await response.json();
       if (result.success) {
-        console.log(`💾 Successfully stored AQI data for ${aqiData.city} in MongoDB`);
         return true;
       }
       return false;

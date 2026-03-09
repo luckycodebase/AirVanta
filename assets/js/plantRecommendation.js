@@ -17,7 +17,6 @@ const PlantRecommendation = {
       
       if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < cacheExpiry) {
         PlantRecommendation.plants = JSON.parse(cached);
-        console.log('Loaded plants from cache');
         return;
       }
 
@@ -28,7 +27,6 @@ const PlantRecommendation = {
       // Cache the data
       localStorage.setItem('plantsData', JSON.stringify(PlantRecommendation.plants));
       localStorage.setItem('plantsDataTime', Date.now().toString());
-      console.log('Loaded and cached plants data');
     } catch (error) {
       console.error('Error loading plants data:', error);
       PlantRecommendation.plants = [];

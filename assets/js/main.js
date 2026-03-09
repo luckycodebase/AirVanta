@@ -3,14 +3,6 @@
 const App = {
   // Initialize application
   init: async () => {
-    console.log('=== AQI Tracker Initializing ===');
-    
-    // CRITICAL: Clear ALL location-related cache
-    console.log('🗑️ Clearing localStorage cache...');
-    localStorage.clear();  // Clear everything to be absolutely sure
-    sessionStorage.clear();
-    console.log('✅ Cache cleared');
-    
     // Setup UI elements
     App.setupUI();
     App.setupDarkMode();
@@ -21,28 +13,26 @@ const App = {
     const locationInput = document.getElementById('locationInput');
     if (locationInput && !locationInput.value) {
       locationInput.placeholder = 'Detecting your location...';
-      console.log('📍 Waiting for geolocation...');
     }
     
     // Initialize all systems
     await PlantRecommendation.loadPlants();
-    Prediction.init();
+    if (typeof Prediction !== 'undefined' && typeof Prediction.init === 'function') {
+      Prediction.init();
+    }
     
     // Initialize new modules
     if (typeof Advisor !== 'undefined') {
-      console.log('Initializing Pollution Advisor...');
       Advisor.init();
     }
     
     if (typeof GlobalRanking !== 'undefined') {
-      console.log('Initializing Global Rankings...');
       setTimeout(() => {
         GlobalRanking.init();
       }, 2000); // Delay to avoid overwhelming API
     }
     
     if (typeof Chatbot !== 'undefined') {
-      console.log('Initializing AI Chatbot...');
       Chatbot.init();
     }
     

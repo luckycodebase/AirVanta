@@ -13,14 +13,15 @@ const Dashboard = {
     }
     
     // Automatically collect historical AQI data for predictions
-    if (data.aqi !== undefined && data.city) {
+    const forecastCity = data.stationCity || data.city;
+    if (data.aqi !== undefined && forecastCity) {
       // Note: AQI data is already stored to MongoDB by API.getAQI() or API.getAQIByCoordinates()
       // No need to store again here to avoid duplicates
       
       // Update history and regenerate forecast for the same city
-      Prediction.collectHistoricalAQI(data.aqi, data.city).then(() => {
+      Prediction.collectHistoricalAQI(data.aqi, forecastCity).then(() => {
         // Wait for history collection to complete before generating forecast
-        Prediction.generateAndDisplayForecast('aqi', data.city);
+        Prediction.generateAndDisplayForecast('aqi', forecastCity);
       });
     }
   },
@@ -46,12 +47,10 @@ const Dashboard = {
   updatePollutants: async (data) => {
     let pollutants = data.pollutants || {};
     
-    console.log(`📊 Dashboard pollutants from current data:`, pollutants);
     
     // If we don't have pollutants from live data, try to fetch from MongoDB
     const hasValidPollutants = Object.values(pollutants).some(v => v !== null && v !== undefined);
     if (!hasValidPollutants && data.city) {
-      console.log(`⚠️ No pollutant data in live response, fetching from MongoDB...`);
       try {
         const response = await fetch(
           `http://localhost:5001/api/aqi/history/${encodeURIComponent(data.city)}?days=1`
@@ -61,7 +60,6 @@ const Dashboard = {
           const latestRecord = Array.isArray(result?.data) && result.data.length > 0 ? result.data[result.data.length - 1] : null;
           if (latestRecord?.pollutants) {
             pollutants = latestRecord.pollutants;
-            console.log(`✅ Loaded pollutants from MongoDB:`, pollutants);
           }
         }
       } catch (err) {
@@ -83,7 +81,6 @@ const Dashboard = {
       if (element) {
         const displayValue = value !== null && value !== undefined ? Math.round(value) : '--';
         element.textContent = displayValue;
-        console.log(`  ✓ ${elementId}: ${displayValue}`);
       } else {
         console.warn(`  ⚠️ Element not found: ${elementId}`);
       }

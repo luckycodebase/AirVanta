@@ -7,7 +7,6 @@ const GlobalRanking = {
 
   // Initialize global ranking
   init: async () => {
-    console.log('Global Pollution Ranking initialized');
     await GlobalRanking.fetchGlobalRankings();
   },
 

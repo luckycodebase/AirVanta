@@ -18,7 +18,6 @@ const ExposureRisk = {
 
   // Initialize module
   init: () => {
-    console.log('🛡️ Initializing Exposure Risk System...');
     ExposureRisk.setupEventListeners();
     ExposureRisk.loadDefaultSettings();
   },
@@ -35,7 +34,6 @@ const ExposureRisk = {
         
         const timeKey = e.target.dataset.time;
         ExposureRisk.exposureTime = ExposureRisk.exposureOptions[timeKey];
-        console.log(`⏱️ Exposure time set to: ${ExposureRisk.exposureTime} hours`);
         
         // Recalculate risk
         ExposureRisk.calculateAndDisplayRisk();
@@ -81,7 +79,6 @@ const ExposureRisk = {
     const pollutionFactor = ExposureRisk.getPollutionFactor(dominantPollutant);
     const riskScore = aqi * exposureTime * pollutionFactor;
     
-    console.log(`📊 Risk Calculation: AQI=${aqi}, Time=${exposureTime}h, Factor=${pollutionFactor}, Score=${riskScore.toFixed(1)}`);
     
     return {
       score: Math.round(riskScore),
@@ -202,7 +199,6 @@ const ExposureRisk = {
   // Fetch weather data from Open-Meteo Weather API
   fetchWeatherData: async (lat, lon) => {
     try {
-      console.log(`🌤️ Fetching weather data for lat=${lat}, lon=${lon}...`);
       
       const response = await fetch(
         `https://api.open-meteo.com/v1/forecast?` +
@@ -229,7 +225,6 @@ const ExposureRisk = {
         timestamp: data.current.time
       };
 
-      console.log('✅ Weather data received:', weatherData);
       ExposureRisk.weatherData = weatherData;
       return weatherData;
 
@@ -272,15 +267,29 @@ const ExposureRisk = {
       // Fallback path for manual use before dashboard has pushed data.
       if (!aqiData) {
         const lastLocation = Utils.storage.get('lastLocation');
-        if (!lastLocation) {
-          console.warn('No location data available');
-          return;
-        }
-
-        if (lastLocation.latitude !== undefined && lastLocation.longitude !== undefined) {
+        if (lastLocation && lastLocation.latitude !== undefined && lastLocation.longitude !== undefined) {
           aqiData = await API.getAQIByCoordinates(lastLocation.latitude, lastLocation.longitude);
-        } else {
+        } else if (lastLocation && lastLocation.city) {
           aqiData = await API.getAQI(lastLocation.city);
+        } else {
+          const coords = await Utils.getDeviceCoordinates({ timeout: 10000, maximumAge: 0 });
+          aqiData = await API.getAQIByCoordinates(coords.latitude, coords.longitude);
+
+          const locationName = await Utils.getLocationName(coords.latitude, coords.longitude);
+          const resolvedCity = locationName || aqiData.city || 'Current Location';
+
+          aqiData.city = resolvedCity;
+          aqiData.stationCity = aqiData.stationCity || aqiData.city;
+
+          Utils.storage.set('lastLocation', {
+            city: resolvedCity,
+            stationCity: aqiData.stationCity,
+            aqi: aqiData.aqi,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            pollutants: aqiData.pollutants || {},
+            timestamp: new Date().toISOString()
+          });
         }
       }
       
@@ -322,7 +331,6 @@ const ExposureRisk = {
       // Create visualization
       ExposureRisk.createRiskCharts(aqiData, risk);
 
-      console.log('✅ Exposure risk analysis complete');
 
     } catch (error) {
       console.error('❌ Error calculating exposure risk:', error);
@@ -719,7 +727,6 @@ const ExposureRisk = {
 
   // Refresh risk analysis
   refreshRiskAnalysis: async () => {
-    console.log('🔄 Refreshing exposure risk analysis...');
     Utils.toggleLoading(true);
     
     try {
