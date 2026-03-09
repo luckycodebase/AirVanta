@@ -146,7 +146,7 @@ const Prediction = {
       let backendHistory = [];
       try {
         const response = await fetch(
-          `http://localhost:5001/api/aqi/history/${encodeURIComponent(city)}?days=30`
+          `https://air-quality-index-tracker.onrender.com/api/aqi/history/${encodeURIComponent(city)}?days=30`
         );
         if (response.ok) {
           const result = await response.json();
@@ -206,7 +206,7 @@ const Prediction = {
   fetchBackendPredictions: async (city, days = 30) => {
     try {
       const response = await fetch(
-        `http://localhost:5001/api/prediction/${encodeURIComponent(city)}?days=${days}`
+        `https://air-quality-index-tracker.onrender.com/api/prediction/${encodeURIComponent(city)}?days=${days}`
       );
 
       if (!response.ok) return null;

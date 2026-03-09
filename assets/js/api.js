@@ -8,7 +8,7 @@ const API = {
     try {
       // Use backend API for better reliability
       const response = await fetch(
-        `http://localhost:5001/api/aqi/${encodeURIComponent(city)}`
+        `https://air-quality-index-tracker.onrender.com/api/aqi/${encodeURIComponent(city)}`
       );
       
       if (!response.ok) {
@@ -47,7 +47,7 @@ const API = {
     try {
       // Use backend API for better reliability
       const response = await fetch(
-        `http://localhost:5001/api/aqi/coordinates/${lat}/${lon}`
+        `https://air-quality-index-tracker.onrender.com/api/aqi/coordinates/${lat}/${lon}`
       );
       
       if (!response.ok) {
@@ -465,7 +465,7 @@ const API = {
       
       // PRIMARY: Fetch from MongoDB backend (authoritative source, stored AQI)
       const response = await fetch(
-        `http://localhost:5001/api/aqi/history/${encodeURIComponent(city)}?days=${days}`
+        `https://air-quality-index-tracker.onrender.com/api/aqi/history/${encodeURIComponent(city)}?days=${days}`
       );
 
       if (response.ok) {
@@ -679,7 +679,7 @@ const API = {
         return false;
       }
 
-      const response = await fetch('http://localhost:5001/api/aqi/store', {
+      const response = await fetch('https://air-quality-index-tracker.onrender.com/api/aqi/store', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

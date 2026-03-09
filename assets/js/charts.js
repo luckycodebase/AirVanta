@@ -43,7 +43,7 @@ const Charts = {
 
     try {
       const response = await fetch(
-        `http://localhost:5001/api/aqi/history/${encodeURIComponent(city)}?days=7`
+        `https://air-quality-index-tracker.onrender.com/api/aqi/history/${encodeURIComponent(city)}?days=7`
       );
 
       if (response.ok) {
@@ -158,7 +158,7 @@ const Charts = {
       if (!hasRealPollutants) {
         try {
           const response = await fetch(
-            `http://localhost:5001/api/aqi/history/${encodeURIComponent(city)}?days=1`
+            `https://air-quality-index-tracker.onrender.com/api/aqi/history/${encodeURIComponent(city)}?days=1`
           );
 
           if (response.ok) {

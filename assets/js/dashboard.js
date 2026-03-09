@@ -53,7 +53,7 @@ const Dashboard = {
     if (!hasValidPollutants && data.city) {
       try {
         const response = await fetch(
-          `http://localhost:5001/api/aqi/history/${encodeURIComponent(data.city)}?days=1`
+          `https://air-quality-index-tracker.onrender.com/api/aqi/history/${encodeURIComponent(data.city)}?days=1`
         );
         if (response.ok) {
           const result = await response.json();
