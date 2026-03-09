@@ -1,6 +1,6 @@
-# AQI Environmental Intelligence Dashboard - Backend API
+# Airlytics - Backend API
 
-Complete Node.js + Express backend for the AQI Environmental Intelligence Dashboard. Provides real-time air quality data, historical pollution tracking, machine learning-based predictions, plant recommendations, and exposure risk calculations.
+Complete Node.js + Express backend for Airlytics Environmental Monitoring Dashboard. Provides real-time air quality data, historical pollution tracking, machine learning-based predictions, plant recommendations, and exposure risk calculations.
 
 ## 🌟 Features
 

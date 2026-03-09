@@ -1,7 +1,7 @@
 {
-  "name": "aqi-backend",
+  "name": "airlytics-backend",
   "version": "1.0.0",
-  "description": "Backend API for AQI Environmental Intelligence Dashboard",
+  "description": "Backend API for Airlytics Environmental Intelligence Dashboard",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

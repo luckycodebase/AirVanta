@@ -1,4 +1,4 @@
-# AQI Tracker - Environmental Monitoring Dashboard
+# Airlytics - Environmental Monitoring Dashboard
 
 A modern, professional environmental monitoring platform that provides real-time air quality index (AQI) data, interactive maps, predictions, and plant recommendations.
 
