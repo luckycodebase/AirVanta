@@ -116,7 +116,11 @@ const Chatbot = {
   },
 
   ensurePlantData: async () => {
-    if (Array.isArray(PlantRecommendation?.plants) && PlantRecommendation.plants.length > 0) {
+    if (
+      typeof PlantRecommendation !== 'undefined' &&
+      Array.isArray(PlantRecommendation.plants) &&
+      PlantRecommendation.plants.length > 0
+    ) {
       Chatbot.plantsData = PlantRecommendation.plants;
       return;
     }
@@ -368,3 +372,6 @@ const Chatbot = {
       <p>Try: "Is it safe to go outside today?" or "Why is AQI high today?"</p>`;
   }
 };
+
+// Required for inline HTML handlers like onclick="Chatbot.toggleChatbot()"
+window.Chatbot = Chatbot;
