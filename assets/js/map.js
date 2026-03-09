@@ -30,7 +30,7 @@ const AQIMap = {
     // Add geolocation button
     document.getElementById('geoBtn')?.addEventListener('click', () => {
       AQIMap.setLocationMode('auto');
-      AQIMap.getCurrentLocation();
+      AQIMap.getCurrentLocation({ forceGps: true });
     });
 
     const locationInput = document.getElementById('locationInput');
@@ -100,7 +100,8 @@ const AQIMap = {
   },
 
   // Get current location
-  getCurrentLocation: () => {
+  getCurrentLocation: (options = {}) => {
+    const forceGps = Boolean(options?.forceGps);
     console.log('🔍 getCurrentLocation() called');
     
     if (!navigator.geolocation) {
@@ -139,11 +140,13 @@ const AQIMap = {
 
             console.log(`📏 GPS vs IP drift: ${driftKm.toFixed(1)} km`);
 
-            if (driftKm > 250) {
+            if (driftKm > 250 && !forceGps) {
               selectedLat = ipLocation.latitude;
               selectedLon = ipLocation.longitude;
               selectedSource = 'ip';
               console.warn('⚠️ Large GPS/IP mismatch detected. Using IP location for this session.');
+            } else if (driftKm > 250 && forceGps) {
+              console.warn('⚠️ Large GPS/IP mismatch detected, but keeping GPS because location button was used.');
             }
           }
 
