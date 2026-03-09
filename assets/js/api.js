@@ -100,6 +100,20 @@ const API = {
       return API.parseAQIData(data.data);
     } catch (error) {
       console.error('Error fetching AQI from WAQI:', error);
+
+      // Fallback 1: geocode city to coordinates, then fetch by coordinates.
+      try {
+        const coords = await API.getCoordinatesByCity(city);
+        if (coords) {
+          const byCoords = await API.getAQIByCoordinatesDirect(coords.lat, coords.lon);
+          if (byCoords && !byCoords.isDemo) {
+            return byCoords;
+          }
+        }
+      } catch (coordError) {
+        console.warn('City geocode fallback failed:', coordError);
+      }
+
       return API.getDemoData();
     }
   },
@@ -123,7 +137,58 @@ const API = {
       return API.parseAQIData(data.data);
     } catch (error) {
       console.error('Error fetching AQI by coordinates from WAQI:', error);
+
+      // Fallback 1: use nearest station from WAQI around endpoint before demo mode.
+      try {
+        const nearby = await API.getNearbyStationsWAQI(lat, lon);
+        if (Array.isArray(nearby) && nearby.length > 0) {
+          const best = nearby.find((s) => Number.isFinite(Number(s?.aqi))) || nearby[0];
+          return {
+            aqi: Number(best?.aqi) || 0,
+            city: best?.city || 'Nearby Station',
+            country: '',
+            timestamp: new Date().toISOString(),
+            pollutants: {
+              pm25: null,
+              pm10: null,
+              o3: null,
+              no2: null,
+              co: null,
+              so2: null
+            },
+            dominantPollutant: 'Unknown',
+            latitude: Number(best?.lat) || Number(lat) || 0,
+            longitude: Number(best?.lon) || Number(lon) || 0,
+            source: 'waqi-nearby'
+          };
+        }
+      } catch (nearbyError) {
+        console.warn('Nearby-station fallback failed:', nearbyError);
+      }
+
       return API.getDemoData();
+    }
+  },
+
+  // Geocode city to coordinates for fallback lookup
+  getCoordinatesByCity: async (city) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}&limit=1`
+      );
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (!Array.isArray(data) || data.length === 0) return null;
+
+      const first = data[0];
+      const lat = Number(first?.lat);
+      const lon = Number(first?.lon);
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      return { lat, lon };
+    } catch (error) {
+      console.warn('Error geocoding city:', error);
+      return null;
     }
   },
 
@@ -169,7 +234,9 @@ const API = {
       },
       dominantPollutant: 'PM2.5',
       latitude: 40.7128,
-      longitude: -74.0060
+      longitude: -74.0060,
+      source: 'demo',
+      isDemo: true
     };
   },
 
