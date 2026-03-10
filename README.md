@@ -1,304 +1,166 @@
-# AirVanta - Environmental Monitoring Dashboard
+# AirVanta - Environmental Monitoring and AQI Intelligence Platform
 
-A modern, professional environmental monitoring platform that provides real-time air quality index (AQI) data, interactive maps, predictions, and plant recommendations.
+![Status](https://img.shields.io/badge/status-active-success)
+![Frontend](https://img.shields.io/badge/frontend-HTML%2FCSS%2FJavaScript-orange)
+![Backend](https://img.shields.io/badge/backend-Node.js%20%2B%20Express-339933?logo=node.js&logoColor=white)
+![Database](https://img.shields.io/badge/database-MongoDB-47A248?logo=mongodb&logoColor=white)
+![Charts](https://img.shields.io/badge/visualization-Chart.js-FF6384?logo=chartdotjs&logoColor=white)
+![Maps](https://img.shields.io/badge/maps-Leaflet-199900?logo=leaflet&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-## Features
+AirVanta is a full-stack environmental intelligence web application that helps users understand current air quality, predict upcoming pollution risk, and take practical action through health guidance, exposure-risk scoring, and plant recommendations.
 
-### 🌍 Real-Time AQI Monitoring
-- Real-time air quality data from multiple sources
-- Automatic location detection via GPS
-- Manual city search with autocomplete
-- Detailed pollutant breakdown (PM2.5, PM10, O₃, NO₂, CO, SO₂)
+## Recruiter Snapshot
 
-### 🗺️ Interactive Map
-- Leaflet.js-powered interactive map
-- Color-coded AQI markers
-- Nearby station detection
-- Click for detailed information
+- Built a production-style full-stack app with a modular frontend and REST API backend.
+- Integrated third-party environmental data APIs and normalized responses for UI consumption.
+- Implemented forecasting endpoints and risk-oriented UX (danger-day alerts, exposure analysis).
+- Designed for real-world usability: location search, map interaction, mobile responsiveness, and dark mode.
 
-### 📊 Data Visualization
-- 7-day AQI trend chart
-- Hourly variation charts
-- 30-day historical trends
-- Pollutant breakdown pie charts
+## Key Capabilities
 
-### 🔮 30-Day AQI Prediction
-- Time-series forecasting using exponential smoothing
-- Weekly pattern analysis
-- Seasonal adjustments
-- Dangerous day prediction alerts
+- Real-time AQI dashboard with pollutant cards (PM2.5, PM10, O3, NO2, CO, SO2)
+- Interactive map using Leaflet markers for location-based AQI exploration
+- 30-day prediction workflow with model metadata and confidence context
+- Personal exposure-risk module based on time outdoors and current conditions
+- AI chatbot assistant for contextual air-quality guidance
+- Global city ranking and comparison views
+- Plant recommendation engine with pollutant-oriented matching
+- Dark mode and mobile-first responsive behavior
 
-### 🌿 Smart Plant Recommendations
-- 15+ air-purifying plants
-- Efficiency-based ranking
-- Pollutant-specific matching
-- Care instructions and compatibility notes
+## Tech Stack
 
-### 💡 Health & Environmental Tips
-- AQI-based health recommendations
-- Environmental awareness content
-- Best practices for air quality management
+### Frontend
+- HTML5
+- CSS3 (custom responsive design system)
+- Vanilla JavaScript (modular architecture)
+- Chart.js
+- Leaflet.js
 
-### 🌙 Dark Mode
-- Toggle between light and dark themes
-- Persistent user preference
-- Optimized for eye comfort
+### Backend
+- Node.js
+- Express.js
+- MongoDB + Mongoose
+- Axios
+- node-cron
 
-## Project Structure
+### External Data Services
+- WAQI API
+- Open-Meteo API
 
-```
+## Project Architecture
+
+```text
 Website/
-├── index.html
-├── assets/
-│   ├── css/
-│   │   └── style.css
-│   ├── js/
-│   │   ├── utils.js             # Utility functions
-│   │   ├── api.js               # API integration
-│   │   ├── dashboard.js         # Dashboard UI updates
-│   │   ├── map.js               # Leaflet map integration
-│   │   ├── charts.js            # Chart.js visualizations
-│   │   ├── prediction.js        # AQI forecasting
-│   │   ├── plantRecommendation.js # Plant system
-│   │   └── main.js              # Main application logic
-│   ├── data/
-│   │   └── plants.json          # Plant database
-│   └── images/
-└── README.md
+|- index.html
+|- assets/
+|  |- css/style.css
+|  |- js/
+|     |- api.js
+|     |- dashboard.js
+|     |- map.js
+|     |- charts.js
+|     |- prediction.js
+|     |- plantRecommendation.js
+|     |- advisor.js
+|     |- exposureRisk.js
+|     |- globalRanking.js
+|     |- chatbot.js
+|     |- main.js
+|- aqi-backend/
+|  |- server.js
+|  |- controllers/
+|  |- routes/
+|  |- services/
+|  |- models/
+|  |- cron/
+|  |- scripts/
 ```
 
-## Technologies Used
+## API Surface (Backend)
 
-- **Frontend**: HTML5, CSS3, Vanilla JavaScript
-- **Maps**: Leaflet.js
-- **Charts**: Chart.js
-- **API**: WAQI (World Air Quality Index)
-- **Data**: JSON-based plant database
-- **Styling**: CSS Grid, Flexbox, CSS Variables
+Representative endpoints:
+
+- `GET /api/aqi/:city`
+- `GET /api/aqi/coordinates/:lat/:lon`
+- `GET /api/aqi/history/:city?days=30`
+- `GET /api/prediction/:city?days=30`
+- `GET /api/prediction/:city/stats?days=30`
+- `GET /api/prediction/:city/dangerous-days?threshold=150`
+- `GET /api/plants/recommend?pollutant=PM2.5&limit=5`
+- `GET /api/plants/top?limit=10`
+- `GET /api/exposure-risk/:city?duration=60`
 
 ## Getting Started
 
-### Prerequisites
-- Modern web browser with JavaScript enabled
-- Internet connection for API calls
+### 1) Frontend
 
-### Installation
+1. Open `index.html` directly in a browser, or
+2. Use a local static server (recommended for consistent behavior).
 
-1. Clone/download the project
-2. Open `index.html` in your web browser
-3. Grant location permissions for automatic location detection
-4. Or enter a city name to search
+### 2) Backend
 
-## How to Use
+From `aqi-backend/`:
 
-### 1. Get AQI Data
-- Click "Use Location" button for automatic detection
-- Or type a city name and click "Search"
-- View real-time AQI and pollutant levels
+```bash
+npm install
+npm run seed
+npm run dev
+```
 
-### 2. View Interactive Map
-- Scroll to the "Interactive AQI Map" section
-- Click on markers to see detailed information
-- Map shows nearby monitoring stations
+Server default: `http://localhost:5000`
 
-### 3. Check Forecast
-- Go to "30-Day Air Quality Forecast" section
-- Switch between AQI, PM2.5, and PM10 predictions
-- View predicted dangerous days
+### 3) Environment Variables
 
-### 4. Get Plant Recommendations
-- Scroll to "Plants That Can Improve Your Air"
-- See AI-recommended plants for your air quality
-- Filter by efficiency level
-- Check plant care instructions
+Create `.env` inside `aqi-backend/` with values for:
 
-### 5. Toggle Dark Mode
-- Click the moon icon in the top navigation
-- Preference is saved automatically
+```env
+PORT=5000
+NODE_ENV=development
+MONGODB_URI=your_mongodb_connection_string
+WAQI_API_KEY=your_waqi_api_key
+OPEN_METEO_BASE_URL=https://air-quality-api.open-meteo.com/v1
+WAQI_BASE_URL=https://api.waqi.info
+DEFAULT_CITIES=New York,London,Beijing,Delhi,Tokyo,Mumbai,Los Angeles,Paris,Sydney,Sao Paulo
+CACHE_TTL=300
+PREDICTION_DAYS=30
+MIN_HISTORICAL_DAYS=15
+```
 
-## API Integration
+## Engineering Highlights
 
-### WAQI API
-- Provides real-time AQI data
-- Free tier available
-- Token: Integrated in api.js
-- Supports 30,000+ monitoring stations worldwide
+- Separation of concerns across controllers, services, and route layers
+- Reusable frontend modules with feature-based organization
+- Graceful API behavior for partial-data scenarios (fallback-oriented responses)
+- Scheduled data collection for historical AQI persistence and trend modeling
+- User-centric UI decisions: clear AQI semantics, risk messaging, and actionable recommendations
 
-### Geolocation & Reverse Geocoding
-- Browser Geolocation API for GPS
-- OpenStreetMap Nominatim for reverse geocoding
+## Why This Project Is Job-Relevant
 
-## Data Files
+This project demonstrates the skills expected in full-stack/product engineering roles:
 
-### plants.json
-Contains 15 plant types with:
-- Pollutants reduced
-- Efficiency percentage
-- Side effects and safety info
-- Best placement recommendations
-- Difficulty level
-- Watering schedule
+- API integration and data transformation
+- Backend endpoint design and reliability handling
+- State-driven frontend UI updates
+- Data visualization and interaction design
+- Domain modeling with MongoDB/Mongoose
+- Feature delivery across end-to-end user flows
 
-## Scripts Overview
+## Suggested Resume Bullets
 
-### utils.js
-- AQI category calculations
-- Health warning messages
-- Date formatting
-- Local storage management
-- Notification system
+- Built a full-stack environmental intelligence dashboard using JavaScript, Node.js, Express, and MongoDB, delivering real-time AQI insights and predictive analytics.
+- Developed modular REST APIs for AQI retrieval, forecasting, and exposure-risk assessment, with robust fallback handling for sparse historical datasets.
+- Implemented interactive map and chart-driven UI experiences with Leaflet and Chart.js to improve interpretability of pollution trends.
+- Engineered pollutant-aware recommendation features (health guidance and plant matching) to translate data into actionable user decisions.
 
-### api.js
-- WAQI API integration
-- Historical data generation
-- Nearby stations retrieval
-- City suggestions
+## Roadmap
 
-### dashboard.js
-- Dashboard UI updates
-- AQI display management
-- Pollutant card updates
-
-### map.js
-- Leaflet map initialization
-- Marker management
-- Geolocation handling
-- Station loading
-
-### charts.js
-- Chart.js initialization
-- Multiple chart types
-- Real-time chart updates
-
-### prediction.js
-- Exponential smoothing forecasting
-- Moving average calculations
-- Dangerous day detection
-
-### plantRecommendation.js
-- Plant recommendation algorithm
-- Filtering and ranking
-- UI rendering
-
-### main.js
-- Application initialization
-- Dark mode management
-- Navigation handling
-
-## AQI Scale & Colors
-
-| AQI Range | Category | Color | Recommendation |
-|-----------|----------|-------|-----------------|
-| 0-50 | Good | 🟢 Green | Enjoy the air! |
-| 51-100 | Moderate | 🟡 Yellow | Sensitive groups limit exposure |
-| 101-150 | Unhealthy for Sensitive Groups | 🟠 Orange | Reduce outdoor exposure |
-| 151-200 | Unhealthy | 🔴 Red | Everyone limit outdoor exposure |
-| 201-300 | Very Unhealthy | 🟣 Purple | Avoid outdoor activities |
-| 300+ | Hazardous | 🟤 Maroon | Stay indoors |
-
-## Prediction Algorithm
-
-The 30-day forecast uses:
-1. **Exponential Smoothing**: Weighted average of past values
-2. **Seasonal Patterns**: Weekly and daily cycles
-3. **Trend Analysis**: Short-term direction
-4. **Random Variation**: Natural fluctuations
-
-## Plant Recommendation Logic
-
-### For Good AQI (0-50)
-- Recommend maintenance plants
-- Focus on efficiency >= 60%
-
-### For Moderate AQI (51-100)
-- Recommend CO and NO₂ reducers
-- Focus on efficiency >= 70%
-
-### For Unhealthy AQI (101-150)
-- Recommend efficient plants
-- Focus on efficiency >= 75%
-
-### For Very Unhealthy/Hazardous (151+)
-- Recommend most efficient plants
-- Focus on efficiency >= 80%
-
-## Browser Compatibility
-
-- Chrome/Chromium (Latest)
-- Firefox (Latest)
-- Safari (Latest)
-- Edge (Latest)
-- Mobile browsers (iOS Safari, Chrome Mobile)
-
-## Performance Optimizations
-
-- Lazy loading of charts and maps
-- CSS animations with hardware acceleration
-- Debounced search functionality
-- Local storage for user preferences
-- Efficient DOM manipulation
-
-## Known Limitations
-
-- WAQI free API has rate limits
-- Predictions are based on historical patterns
-- Plant data is simplified for UX
-- Some features depend on JavaScript enabled
-
-## Future Enhancements
-
-- [ ] Real-time notifications for air quality alerts
-- [ ] Multi-language support
-- [ ] Advanced meteorological data
-- [ ] Custom user watchlists
-- [ ] Export data as PDF/CSV
-- [ ] Offline functionality with Service Workers
-- [ ] Integration with more APIs (EPA, Sentinel-5P)
-- [ ] Machine learning predictions
-- [ ] Community contributions system
-
-## Troubleshooting
-
-### Map not loading?
-- Check internet connection
-- Clear browser cache
-- Allow location permissions
-- Check browser console for errors
-
-### Charts not displaying?
-- Ensure JavaScript is enabled
-- Check that canvas elements exist
-- Verify Chart.js library is loaded
-
-### AQI data not updating?
-- Check API rate limits
-- Verify location spelling
-- Try refreshing the page
-- Check browser console
-
-### Dark mode not persisting?
-- Check if localStorage is enabled
-- Clear site data and try again
-- Check browser privacy settings
-
-## Contributing
-
-This is a demonstration project. Feel free to fork, modify, and improve!
+- Add authentication and user-specific watchlists
+- Add exportable reports (CSV/PDF)
+- Improve forecast model explainability and metrics surfacing
+- Add CI pipeline and automated API tests
+- Add deployment docs for cloud hosting
 
 ## License
 
-This project is open source and available under the MIT License.
-
-## Author
-
-Created as a professional environmental monitoring dashboard.
-
-## Support & Contact
-
-For issues, questions, or suggestions, please check the browser console for error messages or contact the development team.
-
----
-
-**Last Updated**: March 2024
-**Version**: 1.0
-**Status**: Production Ready
+MIT
