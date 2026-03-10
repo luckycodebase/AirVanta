@@ -1,14 +1,16 @@
 # AirVanta - Environmental Monitoring and AQI Intelligence Platform
 
-![Status](https://img.shields.io/badge/status-active-success)
-![Frontend](https://img.shields.io/badge/frontend-HTML%2FCSS%2FJavaScript-orange)
-![Backend](https://img.shields.io/badge/backend-Node.js%20%2B%20Express-339933?logo=node.js&logoColor=white)
-![Database](https://img.shields.io/badge/database-MongoDB-47A248?logo=mongodb&logoColor=white)
-![Charts](https://img.shields.io/badge/visualization-Chart.js-FF6384?logo=chartdotjs&logoColor=white)
-![Maps](https://img.shields.io/badge/maps-Leaflet-199900?logo=leaflet&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-blue)
+![Node.js](https://img.shields.io/badge/Backend-Node.js-339933?logo=node.js\&logoColor=white)
+![Express](https://img.shields.io/badge/Framework-Express.js-000000?logo=express\&logoColor=white)
+![MongoDB](https://img.shields.io/badge/Database-MongoDB-47A248?logo=mongodb\&logoColor=white)
+![Chart.js](https://img.shields.io/badge/Charts-Chart.js-FF6384?logo=chartdotjs\&logoColor=white)
+![Netlify](https://img.shields.io/badge/Frontend-Deployed%20on%20Netlify-00C7B7?logo=netlify\&logoColor=white)
+![Render](https://img.shields.io/badge/Backend-Deployed%20on%20Render-46E3B7?logo=render\&logoColor=black)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
 AirVanta is a full-stack environmental intelligence web application that helps users understand current air quality, predict upcoming pollution risk, and take practical action through health guidance, exposure-risk scoring, and plant recommendations.
+
+Link: https://airvanta.netlify.app/
 
 ## Recruiter Snapshot
 
