@@ -3,6 +3,7 @@
 const Prediction = {
   forecastChart: null,
   historicalData: [],
+  predictions: [],
   model: null,
   initialized: false,
   activeRequestId: 0,
@@ -808,6 +809,9 @@ const Prediction = {
       // STEP 4: Create chart with both historical and predictions
       Prediction.createForecastChart(historicalData, predictions, type);
 
+      // Store predictions for chatbot access
+      Prediction.predictions = predictions;
+
       // STEP 5: Update dangerous days warning
       const warningText = Prediction.getDangerousDays(predictions);
       const warningElement = document.getElementById('warningDays');
@@ -848,6 +852,9 @@ const Prediction = {
     }
   }
 };
+
+// Export for chatbot access
+window.Prediction = Prediction;
 
 // Initialize prediction system when DOM is ready
 document.addEventListener('DOMContentLoaded', Prediction.init);
