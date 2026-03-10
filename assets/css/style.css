@@ -2580,10 +2580,31 @@ PLANTS SECTION
     background: var(--primary-green);
     color: white;
     border: none;
-    padding: 12px 20px;
+    padding: 0;
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
+}
+
+.chatbot-send {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
+    border-radius: 50%;
+    position: relative;
+}
+
+.chatbot-send i {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.95rem;
+    line-height: 1;
 }
 
 .chatbot-send:hover,
