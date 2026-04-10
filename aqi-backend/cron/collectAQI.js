@@ -6,7 +6,6 @@ require('dotenv').config();
 
 const waqiService = require('../services/waqiService');
 const AQIHistory = require('../models/AQIHistory');
-const WatchedCity = require('../models/WatchedCity');
 
 /**
  * Collect AQI data for default cities and user-watched cities and store in database
@@ -22,15 +21,8 @@ async function collectAQI() {
     
     const defaultCities = citiesString.split(',').map(city => city.trim());
     
-    // Get watched cities from database (active and autofetch enabled)
-    const watchedCities = await WatchedCity.find({
-      isActive: true,
-      autoFetchEnabled: true
-    })
-    .sort({ usageCount: -1 }) // Prioritize frequently searched cities
-    .select('city')
-    .lean();
-
+    // Get watched cities from database (autofetch enabled)
+    const watchedCities = await AQIHistory.getWatchedCities(true);
     const watchedCityNames = watchedCities.map(w => w.city);
 
     // Combine cities, removing duplicates (watched cities take precedence)
@@ -92,7 +84,9 @@ async function collectAQI() {
             dominantPollutant: aqiData.dominantPollutant,
             category: waqiService.getAQICategory(aqiData.aqi),
             date: new Date(),
-            source: 'WAQI'
+            source: 'WAQI',
+            isWatched: watchedCityNames.includes(city.toLowerCase()),
+            autoFetchEnabled: true
           });
 
           await aqiRecord.save();
@@ -100,12 +94,8 @@ async function collectAQI() {
           console.log(`✅ Stored new AQI data for ${aqiData.city}: ${aqiData.aqi}`);
         }
 
-        // Update watched city fetch status if it exists
-        const normalizedCity = city.toLowerCase().trim();
-        const watchedCityRecord = await WatchedCity.findOne({ city: normalizedCity });
-        if (watchedCityRecord) {
-          await watchedCityRecord.recordFetch(true);
-        }
+        // Update fetch status for monitored cities
+        await AQIHistory.recordFetchAttempt(aqiData.city, true);
 
         successCount++;
         results.push({
@@ -121,12 +111,8 @@ async function collectAQI() {
       } catch (error) {
         console.error(`❌ Error collecting data for ${city}:`, error.message);
         
-        // Record failed fetch for watched city
-        const normalizedCity = city.toLowerCase().trim();
-        const watchedCityRecord = await WatchedCity.findOne({ city: normalizedCity });
-        if (watchedCityRecord) {
-          await watchedCityRecord.recordFetch(false);
-        }
+        // Record failed fetch attempt
+        await AQIHistory.recordFetchAttempt(city, false);
 
         failureCount++;
         results.push({

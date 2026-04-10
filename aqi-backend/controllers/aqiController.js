@@ -3,7 +3,6 @@
 const waqiService = require('../services/waqiService');
 const openMeteoService = require('../services/openMeteoService');
 const AQIHistory = require('../models/AQIHistory');
-const WatchedCity = require('../models/WatchedCity');
 
 /**
  * Get current AQI data for a city
@@ -26,11 +25,11 @@ exports.getCurrentAQI = async (req, res) => {
 
     // Register city for autofetch (non-blocking)
     try {
-      await WatchedCity.findOrCreateFromAQI(aqiData);
-      console.log(`📌 City registered in watchlist: ${aqiData.city}`);
+      await AQIHistory.recordCityAccess(aqiData.city);
+      console.log(`📌 City registered for autofetch: ${aqiData.city}`);
     } catch (error) {
-      console.error(`⚠️  Failed to register city in watchlist:`, error.message);
-      // Don't block the response if watchlist update fails
+      console.error(`⚠️  Failed to register city for autofetch:`, error.message);
+      // Don't block the response if registration fails
     }
 
     // Add health recommendations
@@ -78,11 +77,11 @@ exports.getAQIByCoordinates = async (req, res) => {
 
     // Register city for autofetch (non-blocking)
     try {
-      await WatchedCity.findOrCreateFromAQI(aqiData);
-      console.log(`📌 City registered in watchlist: ${aqiData.city}`);
+      await AQIHistory.recordCityAccess(aqiData.city);
+      console.log(`📌 City registered for autofetch: ${aqiData.city}`);
     } catch (error) {
-      console.error(`⚠️  Failed to register city in watchlist:`, error.message);
-      // Don't block the response if watchlist update fails
+      console.error(`⚠️  Failed to register city for autofetch:`, error.message);
+      // Don't block the response if registration fails
     }
 
     const category = waqiService.getAQICategory(aqiData.aqi);
@@ -317,11 +316,11 @@ exports.storeAQI = async (req, res) => {
 
     // Register city for autofetch (non-blocking)
     try {
-      await WatchedCity.findOrCreateFromAQI(aqiData);
-      console.log(`📌 City registered in watchlist: ${aqiData.city}`);
+      await AQIHistory.recordCityAccess(aqiData.city);
+      console.log(`📌 City registered for autofetch: ${aqiData.city}`);
     } catch (error) {
-      console.error(`⚠️  Failed to register city in watchlist:`, error.message);
-      // Don't block the response if watchlist update fails
+      console.error(`⚠️  Failed to register city for autofetch:`, error.message);
+      // Don't block the response if registration fails
     }
 
     console.log(`✅ AQI data upserted for ${aqiData.city} (AQI: ${aqiData.aqi}, Category: ${category}, Source: ${sourceLabel})`);
@@ -455,18 +454,9 @@ exports.calculateTrend = (values) => {
  */
 exports.getWatchedCities = async (req, res) => {
   try {
-    const { activeOnly = true, sort = '-usageCount' } = req.query;
+    const { activeOnly = true } = req.query;
 
-    const query = { isActive: true };
-    
-    if (activeOnly === 'true') {
-      query.autoFetchEnabled = true;
-    }
-
-    const watchedCities = await WatchedCity.find(query)
-      .sort(sort)
-      .select('-__v')
-      .lean();
+    const watchedCities = await AQIHistory.getWatchedCities(activeOnly === 'true');
 
     res.json({
       success: true,
@@ -496,22 +486,31 @@ exports.addWatchedCity = async (req, res) => {
       });
     }
 
-    // Create watched city entry
-    const watchedCity = await WatchedCity.findOneAndUpdate(
-      { city: city.toLowerCase().trim() },
+    // Create or update AQI record with autofetch enabled
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(today);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    const watchedCity = await AQIHistory.findOneAndUpdate(
+      { 
+        city: city.toLowerCase().trim(),
+        date: { $gte: today, $lt: tomorrowStart }
+      },
       {
         $set: {
-          city: city.toLowerCase().trim(),
           country: country || '',
           latitude: parseFloat(latitude),
           longitude: parseFloat(longitude),
-          isActive: true,
-          autoFetchEnabled: true,
-          source: 'manual_add'
+          isWatched: true,
+          autoFetchEnabled: true
         },
         $setOnInsert: {
-          usageCount: 1,
-          dateAdded: new Date()
+          city: city.toLowerCase().trim(),
+          aqi: 0,
+          category: 'Good',
+          date: new Date(),
+          source: 'Manual'
         }
       },
       {
@@ -550,11 +549,7 @@ exports.removeWatchedCity = async (req, res) => {
       });
     }
 
-    const result = await WatchedCity.findOneAndUpdate(
-      { city: city.toLowerCase().trim() },
-      { isActive: false, autoFetchEnabled: false },
-      { new: true }
-    );
+    const result = await AQIHistory.toggleAutoFetch(city, false);
 
     if (!result) {
       return res.status(404).json({
@@ -592,23 +587,26 @@ exports.toggleWatchedCity = async (req, res) => {
       });
     }
 
-    const watchedCity = await WatchedCity.findOne({ city: city.toLowerCase().trim() });
+    // Get current state and toggle
+    const latestRecord = await AQIHistory.findOne({ city: city.toLowerCase().trim() })
+      .sort({ date: -1 })
+      .exec();
 
-    if (!watchedCity) {
+    if (!latestRecord) {
       return res.status(404).json({
         error: `City "${city}" not found in watched list`
       });
     }
 
-    watchedCity.autoFetchEnabled = !watchedCity.autoFetchEnabled;
-    await watchedCity.save();
+    const newState = !latestRecord.autoFetchEnabled;
+    const updated = await AQIHistory.toggleAutoFetch(city, newState);
 
-    console.log(`✅ Autofetch toggled for: ${city} (enabled: ${watchedCity.autoFetchEnabled})`);
+    console.log(`✅ Autofetch toggled for: ${city} (enabled: ${updated.autoFetchEnabled})`);
 
     res.json({
       success: true,
-      message: `Autofetch ${watchedCity.autoFetchEnabled ? 'enabled' : 'disabled'} for ${city}`,
-      data: watchedCity
+      message: `Autofetch ${updated.autoFetchEnabled ? 'enabled' : 'disabled'} for ${city}`,
+      data: updated
     });
 
   } catch (error) {
@@ -625,17 +623,14 @@ exports.toggleWatchedCity = async (req, res) => {
  */
 exports.getWatchedCitiesStatistics = async (req, res) => {
   try {
-    const totalWatchedCities = await WatchedCity.countDocuments();
-    const activeWatchedCities = await WatchedCity.countDocuments({ 
-      isActive: true, 
-      autoFetchEnabled: true 
-    });
+    const watchedCities = await AQIHistory.getWatchedCities(false);
     
-    const topCities = await WatchedCity.find({ isActive: true })
-      .sort({ usageCount: -1 })
-      .limit(10)
-      .select('city usageCount lastAccessed country')
-      .lean();
+    const totalWatchedCities = watchedCities.length;
+    const activeWatchedCities = watchedCities.filter(c => c.autoFetchEnabled).length;
+    
+    const topCities = watchedCities
+      .sort((a, b) => b.usageCount - a.usageCount)
+      .slice(0, 10);
 
     const statistics = {
       totalWatchedCities,
