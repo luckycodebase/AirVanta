@@ -3,6 +3,7 @@
 const waqiService = require('../services/waqiService');
 const openMeteoService = require('../services/openMeteoService');
 const AQIHistory = require('../models/AQIHistory');
+const WatchedCity = require('../models/WatchedCity');
 
 /**
  * Get current AQI data for a city
@@ -22,6 +23,15 @@ exports.getCurrentAQI = async (req, res) => {
 
     // Fetch from WAQI API
     const aqiData = await waqiService.fetchCurrentAQI(city);
+
+    // Register city for autofetch (non-blocking)
+    try {
+      await WatchedCity.findOrCreateFromAQI(aqiData);
+      console.log(`📌 City registered in watchlist: ${aqiData.city}`);
+    } catch (error) {
+      console.error(`⚠️  Failed to register city in watchlist:`, error.message);
+      // Don't block the response if watchlist update fails
+    }
 
     // Add health recommendations
     const healthRecommendations = waqiService.getHealthRecommendations(aqiData.aqi);
@@ -65,6 +75,15 @@ exports.getAQIByCoordinates = async (req, res) => {
       parseFloat(lat),
       parseFloat(lon)
     );
+
+    // Register city for autofetch (non-blocking)
+    try {
+      await WatchedCity.findOrCreateFromAQI(aqiData);
+      console.log(`📌 City registered in watchlist: ${aqiData.city}`);
+    } catch (error) {
+      console.error(`⚠️  Failed to register city in watchlist:`, error.message);
+      // Don't block the response if watchlist update fails
+    }
 
     const category = waqiService.getAQICategory(aqiData.aqi);
     const healthRecommendations = waqiService.getHealthRecommendations(aqiData.aqi);
@@ -296,6 +315,15 @@ exports.storeAQI = async (req, res) => {
       }
     );
 
+    // Register city for autofetch (non-blocking)
+    try {
+      await WatchedCity.findOrCreateFromAQI(aqiData);
+      console.log(`📌 City registered in watchlist: ${aqiData.city}`);
+    } catch (error) {
+      console.error(`⚠️  Failed to register city in watchlist:`, error.message);
+      // Don't block the response if watchlist update fails
+    }
+
     console.log(`✅ AQI data upserted for ${aqiData.city} (AQI: ${aqiData.aqi}, Category: ${category}, Source: ${sourceLabel})`);
 
     res.json({
@@ -415,4 +443,216 @@ exports.calculateTrend = (values) => {
   
   if (Math.abs(diff) < 5) return 'Stable';
   return diff > 0 ? 'Increasing' : 'Decreasing';
+};
+
+// ============================================
+// WATCHED CITIES MANAGEMENT ENDPOINTS
+// ============================================
+
+/**
+ * Get all watched cities (for autofetch)
+ * @route GET /api/aqi/watched-cities/list
+ */
+exports.getWatchedCities = async (req, res) => {
+  try {
+    const { activeOnly = true, sort = '-usageCount' } = req.query;
+
+    const query = { isActive: true };
+    
+    if (activeOnly === 'true') {
+      query.autoFetchEnabled = true;
+    }
+
+    const watchedCities = await WatchedCity.find(query)
+      .sort(sort)
+      .select('-__v')
+      .lean();
+
+    res.json({
+      success: true,
+      count: watchedCities.length,
+      cities: watchedCities
+    });
+
+  } catch (error) {
+    console.error('❌ Error in getWatchedCities:', error.message);
+    res.status(500).json({
+      error: error.message || 'Failed to fetch watched cities'
+    });
+  }
+};
+
+/**
+ * Add a city to watched list manually
+ * @route POST /api/aqi/watched-cities/add
+ */
+exports.addWatchedCity = async (req, res) => {
+  try {
+    const { city, country, latitude, longitude } = req.body;
+
+    if (!city || latitude === undefined || longitude === undefined) {
+      return res.status(400).json({
+        error: 'City, latitude, and longitude are required'
+      });
+    }
+
+    // Create watched city entry
+    const watchedCity = await WatchedCity.findOneAndUpdate(
+      { city: city.toLowerCase().trim() },
+      {
+        $set: {
+          city: city.toLowerCase().trim(),
+          country: country || '',
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude),
+          isActive: true,
+          autoFetchEnabled: true,
+          source: 'manual_add'
+        },
+        $setOnInsert: {
+          usageCount: 1,
+          dateAdded: new Date()
+        }
+      },
+      {
+        new: true,
+        upsert: true
+      }
+    );
+
+    console.log(`✅ City added to watched list: ${watchedCity.city}`);
+
+    res.json({
+      success: true,
+      message: `${city} added to watched cities for autofetch`,
+      data: watchedCity
+    });
+
+  } catch (error) {
+    console.error('❌ Error in addWatchedCity:', error.message);
+    res.status(500).json({
+      error: error.message || 'Failed to add watched city'
+    });
+  }
+};
+
+/**
+ * Remove a city from watched list
+ * @route DELETE /api/aqi/watched-cities/:city
+ */
+exports.removeWatchedCity = async (req, res) => {
+  try {
+    const { city } = req.params;
+
+    if (!city) {
+      return res.status(400).json({
+        error: 'City parameter is required'
+      });
+    }
+
+    const result = await WatchedCity.findOneAndUpdate(
+      { city: city.toLowerCase().trim() },
+      { isActive: false, autoFetchEnabled: false },
+      { new: true }
+    );
+
+    if (!result) {
+      return res.status(404).json({
+        error: `City "${city}" not found in watched list`
+      });
+    }
+
+    console.log(`✅ City removed from watched list: ${city}`);
+
+    res.json({
+      success: true,
+      message: `${city} removed from watched cities`,
+      data: result
+    });
+
+  } catch (error) {
+    console.error('❌ Error in removeWatchedCity:', error.message);
+    res.status(500).json({
+      error: error.message || 'Failed to remove watched city'
+    });
+  }
+};
+
+/**
+ * Toggle autofetch for a specific city
+ * @route PATCH /api/aqi/watched-cities/:city/toggle
+ */
+exports.toggleWatchedCity = async (req, res) => {
+  try {
+    const { city } = req.params;
+
+    if (!city) {
+      return res.status(400).json({
+        error: 'City parameter is required'
+      });
+    }
+
+    const watchedCity = await WatchedCity.findOne({ city: city.toLowerCase().trim() });
+
+    if (!watchedCity) {
+      return res.status(404).json({
+        error: `City "${city}" not found in watched list`
+      });
+    }
+
+    watchedCity.autoFetchEnabled = !watchedCity.autoFetchEnabled;
+    await watchedCity.save();
+
+    console.log(`✅ Autofetch toggled for: ${city} (enabled: ${watchedCity.autoFetchEnabled})`);
+
+    res.json({
+      success: true,
+      message: `Autofetch ${watchedCity.autoFetchEnabled ? 'enabled' : 'disabled'} for ${city}`,
+      data: watchedCity
+    });
+
+  } catch (error) {
+    console.error('❌ Error in toggleWatchedCity:', error.message);
+    res.status(500).json({
+      error: error.message || 'Failed to toggle watched city'
+    });
+  }
+};
+
+/**
+ * Get autofetch statistics
+ * @route GET /api/aqi/watched-cities/statistics
+ */
+exports.getWatchedCitiesStatistics = async (req, res) => {
+  try {
+    const totalWatchedCities = await WatchedCity.countDocuments();
+    const activeWatchedCities = await WatchedCity.countDocuments({ 
+      isActive: true, 
+      autoFetchEnabled: true 
+    });
+    
+    const topCities = await WatchedCity.find({ isActive: true })
+      .sort({ usageCount: -1 })
+      .limit(10)
+      .select('city usageCount lastAccessed country')
+      .lean();
+
+    const statistics = {
+      totalWatchedCities,
+      activeWatchedCities,
+      inactiveCities: totalWatchedCities - activeWatchedCities,
+      topSearchedCities: topCities
+    };
+
+    res.json({
+      success: true,
+      statistics
+    });
+
+  } catch (error) {
+    console.error('❌ Error in getWatchedCitiesStatistics:', error.message);
+    res.status(500).json({
+      error: error.message || 'Failed to fetch statistics'
+    });
+  }
 };
